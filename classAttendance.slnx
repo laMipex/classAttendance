@@ -1,3 +1,16 @@
 <Solution>
-  <Project Path="classAttendance.csproj" />
+  <Folder Name="/src/">
+    <Project Path="ClassAttendance.Api/ClassAttendance.Api.csproj" Id="332036e3-5b77-4eeb-b081-fa39f517b130" />
+    <Project Path="ClassAttendance.Application/ClassAttendance.Application.csproj" Id="af80167a-3e82-4a1c-b6de-58b2b18e11eb" />
+    <Project Path="ClassAttendance.Domain/ClassAttendance.Domain.csproj" Id="909b0113-c8a1-4122-a2bd-c65863f131ab" />
+    <Project Path="ClassAttendance.Infrastructure/ClassAttendance.Infrastructure.csproj" Id="bea494e2-fa57-4ac6-8cb2-7aefef5c939f" />
+    <Project Path="ClassAttendance.Mobile/ClassAttendance.Mobile.csproj" Id="75bfcf4d-c9a5-4ac5-bf2f-6f1555bb012c">
+      <Deploy Solution="Debug|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="ClassAttendance.Api.Tests/ClassAttendance.Api.Tests.csproj" Id="5f2f1dff-fbb4-491e-9988-5ae51c01f602" />
+    <Project Path="ClassAttendance.Application.Tests/ClassAttendance.Application.Tests.csproj" Id="f29fc6fd-83cf-4dc6-8328-55b399930122" />
+    <Project Path="ClassAttendance.Infrastructure.Tests/ClassAttendance.Infrastructure.Tests.csproj" Id="5340bca0-ec1f-48c2-8d34-b402dc14200d" />
+  </Folder>
 </Solution>
