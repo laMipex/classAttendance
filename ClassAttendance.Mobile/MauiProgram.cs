@@ -17,9 +17,9 @@ namespace ClassAttendance.Mobile
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
-#if DEBUG
-            builder.Logging.AddDebug();
-#endif
+
+           builder.Logging.AddDebug();
+
 
             return builder.Build();
         }
