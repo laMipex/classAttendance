@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using ClassAttendance.Domain.Entities;
+using System.Reflection.Emit;
 
 namespace ClassAttendance.Infrastructure.Persistence;
 
