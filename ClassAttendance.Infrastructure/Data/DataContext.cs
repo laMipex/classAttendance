@@ -1,7 +1,5 @@
 using ClassAttendance.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic.FileIO;
-using System.Reflection.Emit;
 
 namespace ClassAttendance.Infrastructure.Persistence;
 
@@ -41,12 +39,14 @@ public class DataContext : Microsoft.EntityFrameworkCore.DbContext
         modelBuilder.Entity<Student>()
             .HasOne(u => u.User)
             .WithOne()
-            .HasForeignKey<Student>(u => u.UserId);
+            .HasForeignKey<Student>(u => u.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Student>()
             .HasOne(s => s.StudyProgram)
             .WithMany(sp => sp.Students)
-            .HasForeignKey(s => s.StudyProgramId);
+            .HasForeignKey(s => s.StudyProgramId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // ----- Professor ------
         modelBuilder.Entity<Professor>()
@@ -55,7 +55,8 @@ public class DataContext : Microsoft.EntityFrameworkCore.DbContext
         modelBuilder.Entity<Professor>()
             .HasOne(u => u.User)
             .WithOne()
-            .HasForeignKey<Professor>(u => u.UserId);
+            .HasForeignKey<Professor>(u => u.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // ----- Subject ------
         modelBuilder.Entity<Subject>()
@@ -68,30 +69,120 @@ public class DataContext : Microsoft.EntityFrameworkCore.DbContext
         modelBuilder.Entity<SubjectProfessor>()
             .HasOne(sp => sp.Subject)
             .WithMany()
-            .HasForeignKey(sp => sp.SubjectId);
+            .HasForeignKey(sp => sp.SubjectId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<SubjectProfessor>()
             .HasOne(sp => sp.Professor)
             .WithMany()
-            .HasForeignKey(sp => sp.ProfessorId);
-
+            .HasForeignKey(sp => sp.ProfessorId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // ----- Enrollment ------
         modelBuilder.Entity<Enrollment>()
             .HasKey(e => new { e.StudentId, e.SubjectId });
 
+        modelBuilder.Entity<Enrollment>()
+            .HasOne(e => e.Student)
+            .WithMany()
+            .HasForeignKey(e => e.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Enrollment>()
+            .HasOne(e => e.Subject)
+            .WithMany()
+            .HasForeignKey(e => e.SubjectId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         // ----- Lecture ------
         modelBuilder.Entity<Lecture>()
-            .HasIndex(l => new { l.SubjectId, l.StartsAt });
+        .HasIndex(l => new { l.SubjectId, l.StartsAt });
+
+        modelBuilder.Entity<Lecture>()
+            .HasOne(l => l.Subject)
+            .WithMany()
+            .HasForeignKey(l => l.SubjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Lecture>()
+            .HasOne(l => l.Professor)
+            .WithMany()
+            .HasForeignKey(l => l.ProfessorId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ----- AttendanceSession ------
+        modelBuilder.Entity<AttendanceSession>()
+            .HasOne(a => a.Lecture)
+            .WithMany()
+            .HasForeignKey(a => a.LectureId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // ----- Attendance ------
         modelBuilder.Entity<Attendance>()
-            .HasIndex(a => new { a.AttendanceSessionId, a.StudentId })
-            .IsUnique();
+        .HasIndex(a => new { a.AttendanceSessionId, a.StudentId })
+        .IsUnique();
+
+        modelBuilder.Entity<Attendance>()
+            .HasOne(a => a.AttendanceSession)
+            .WithMany()
+            .HasForeignKey(a => a.AttendanceSessionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Attendance>()
+            .HasOne(a => a.Student)
+            .WithMany()
+            .HasForeignKey(a => a.StudentId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // ----- StudentDevice ------
+        modelBuilder.Entity<StudentDevice>()
+            .HasOne(sd => sd.Student)
+            .WithMany()
+            .HasForeignKey(sd => sd.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ----- QuizSession ------
+        modelBuilder.Entity<QuizSession>()
+            .HasOne(qs => qs.Lecture)
+            .WithMany()
+            .HasForeignKey(qs => qs.LectureId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ----- QuizQuestion ------
+        modelBuilder.Entity<QuizQuestion>()
+            .HasOne(qq => qq.QuizSession)
+            .WithMany()
+            .HasForeignKey(qq => qq.QuizSessionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ----- QuizOption ------
+        modelBuilder.Entity<QuizOption>()
+            .HasOne(qo => qo.Question)
+            .WithMany()
+            .HasForeignKey(qo => qo.QuestionId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // ----- QuizResponse ------
         modelBuilder.Entity<QuizResponse>()
             .HasIndex(qr => new { qr.QuizSessionId, qr.QuestionId, qr.StudentId })
             .IsUnique();
+
+        modelBuilder.Entity<QuizResponse>()
+            .HasOne(qr => qr.QuizSession)
+            .WithMany()
+            .HasForeignKey(qr => qr.QuizSessionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<QuizResponse>()
+            .HasOne(qr => qr.Question)
+            .WithMany()
+            .HasForeignKey(qr => qr.QuestionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<QuizResponse>()
+            .HasOne(qr => qr.Student)
+            .WithMany()
+            .HasForeignKey(qr => qr.StudentId)
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }
