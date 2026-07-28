@@ -4,7 +4,11 @@ using System.Text;
 
 namespace ClassAttendance.Domain.Entities
 {
-    internal class Professor
+    public class Professor
     {
+        public int UserId { get; set; }
+        public string EmployeeCode { get; set; } = null!;
+
+        public User User { get; set; } = null!;
     }
 }
