@@ -5,9 +5,9 @@ using System.Reflection.Emit;
 
 namespace ClassAttendance.Infrastructure.Persistence;
 
-public class AppDbContext : DbContext
+public class DataContext : Microsoft.EntityFrameworkCore.DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
     }
 
