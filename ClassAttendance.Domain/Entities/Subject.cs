@@ -4,7 +4,12 @@ using System.Text;
 
 namespace ClassAttendance.Domain.Entities
 {
-    internal class Subject
+    public class Subject
     {
+        public int Id { get; set; }
+        public string Code { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public int ETCS { get; set; }
+        public int Semester { get; set; }
     }
 }

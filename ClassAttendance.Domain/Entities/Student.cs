@@ -4,7 +4,13 @@ using System.Text;
 
 namespace ClassAttendance.Domain.Entities
 {
-    internal class Student
+    public class Student
     {
+        public int UserId { get; set; }
+        public string Index { get; set; } = null!;
+        public int StudyProgramId { get; set; }
+
+        public User User { get; set; } = null!;
+        public StudyProgram StudyProgram { get; set; } = null!;
     }
 }
