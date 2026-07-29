@@ -1,3 +1,4 @@
+using ClassAttendance.Infrastructure.Data;
 using ClassAttendance.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,13 @@ builder.Services.AddDbContext<DataContext>(options =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var dbContext = services.GetRequiredService<DataContext>();
+    await Seed.SeedAsync(dbContext);
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
