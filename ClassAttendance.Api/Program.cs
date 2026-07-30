@@ -1,5 +1,7 @@
+using ClassAttendance.Application.Interfaces.Repositories;
 using ClassAttendance.Infrastructure.Data;
 using ClassAttendance.Infrastructure.Persistence;
+using ClassAttendance.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,10 @@ builder.Services.AddDbContext<DataContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
+builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+builder.Services.AddScoped<ILectureRepository, LectureRepository>();    
+
 
 var app = builder.Build();
 
