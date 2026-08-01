@@ -10,7 +10,7 @@ namespace ClassAttendance.Application.Interfaces.Repositories
         Task<Student?> GetByUserId(int userId, CancellationToken cancellationToken = default);
 
         Task<bool> IsEnrolledInSubject(
-            int studnetId,
+            int studentId,
             int subjectId,
             CancellationToken cancellationToken = default);
     }

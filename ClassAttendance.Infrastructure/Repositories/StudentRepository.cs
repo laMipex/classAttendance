@@ -19,13 +19,13 @@ public sealed class StudentRepository(DataContext dbContext) : IStudentRepositor
     }
 
     public Task<bool> IsEnrolledInSubject (
-        int stundentId,
+        int studentId,
         int subjectId,  
         CancellationToken cancellationToken = default)
     {
         return dbContext.Enrollments.AnyAsync(
             enrollment => enrollment.SubjectId == subjectId &&
-            enrollment.SubjectId == stundentId &&
+            enrollment.StudentId == studentId &&
             enrollment.Status == "Active", cancellationToken
             );
     }
