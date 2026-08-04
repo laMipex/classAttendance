@@ -1,5 +1,6 @@
 ﻿using ClassAttendance.Domain.Entities;
 using ClassAttendance.Infrastructure.Persistence;
+using ClassAttendance.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -26,7 +27,7 @@ namespace ClassAttendance.Infrastructure.Data
                 FirstName = "Ivan",
                 LastName = "Ivanović",
                 Email = "ivan.ivanovic@classattendance.com",
-                Password = "Prof123!",
+                Password = PasswordHasher.HashPassword("Prof123!"),
                 Role = "Professor",
                 IsActive = true
             };
@@ -35,7 +36,7 @@ namespace ClassAttendance.Infrastructure.Data
                 FirstName = "Marko",
                 LastName = "Marković",
                 Email = "marko.markovic@classattendance.com",
-                Password = "Student123!",
+                Password = PasswordHasher.HashPassword("Student123!"),
                 Role = "Student",
                 IsActive = true
             };
@@ -44,7 +45,7 @@ namespace ClassAttendance.Infrastructure.Data
                 FirstName = "Ana",
                 LastName = "Nikolić",
                 Email = "ana.nikolic@classattendance.com",
-                Password = "Student123!",
+                Password = PasswordHasher.HashPassword("Student123!"),
                 Role = "Student",
                 IsActive = true
             };
@@ -52,18 +53,18 @@ namespace ClassAttendance.Infrastructure.Data
             await db.SaveChangesAsync(ct);
             var professor = new Professor
             {
-                UserId = professorUser.id,
+                UserId = professorUser.Id,
                 EmployeeCode = "EMP-0001"
             };
             var student1 = new Student
             {
-                UserId = student1User.id,
+                UserId = student1User.Id,
                 Index = "26122083",
                 StudyProgramId = studyProgram.Id
             };
             var student2 = new Student
             {
-                UserId = student2User.id,
+                UserId = student2User.Id,
                 Index = "26122035",
                 StudyProgramId = studyProgram.Id
             };

@@ -30,7 +30,7 @@ public sealed class AuthenticationService : IAuthenticationService
                     && candidate.User.IsActive,
                 cancellationToken);
 
-        if (student is null || student.User.Password != password)
+        if (student is null || !PasswordHasher.VerifyPassword(password, student.User.Password))
         {
             return null;
         }
@@ -50,7 +50,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 && candidate.IsActive,
             cancellationToken);
 
-        if (user is null || user.Password != password)
+        if (user is null || !PasswordHasher.VerifyPassword(password, user.Password))
         {
             return null;
         }

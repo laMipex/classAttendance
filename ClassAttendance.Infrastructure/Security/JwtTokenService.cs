@@ -27,8 +27,8 @@ public sealed class JwtTokenService
         var expiresAt = DateTime.UtcNow.AddMinutes(_options.ExpirationMinutes);
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.id.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, user.id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role)
@@ -47,7 +47,7 @@ public sealed class JwtTokenService
         return new LoginResult(
             new JwtSecurityTokenHandler().WriteToken(token),
             expiresAt,
-            user.id,
+            user.Id,
             user.Email,
             user.Role);
     }
