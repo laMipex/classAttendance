@@ -22,6 +22,13 @@ public sealed class ScheduleService(ILectureRepository lectureRepository) : ISch
             $"{lecture.Professor.User.FirstName} {lecture.Professor.User.LastName}",
             lecture.StartsAt,
             lecture.EndsAt,
-            lecture.Rooms)).ToList();
+            lecture.Rooms,
+            lecture.AttendanceSessions
+                .OrderBy(session => session.OpenFrom)
+                .Select(session => new ScheduleAttendanceSessionDto(
+                    session.Id,
+                    session.OpenFrom,
+                    session.OpenUntil))
+                .ToList())).ToList();
     }
 }

@@ -8,5 +8,6 @@ public sealed record ScheduleLectureDto(
     string ProfessorName,
     DateTime StartsAt,
     DateTime EndsAt,
-    string? Room
+    string? Room,
+    IReadOnlyList<ScheduleAttendanceSessionDto> AttendanceSessions
 );

@@ -8,8 +8,8 @@ namespace ClassAttendance.Domain.Entities
     {
         public int Id { get; set; }
         public int SubjectId { get; set; }
-        public int ProfessorId { get; set; }        
-        
+        public int ProfessorId { get; set; }
+
         public DateTime StartsAt { get; set; }
         public DateTime EndsAt { get; set; }
 
@@ -17,5 +17,6 @@ namespace ClassAttendance.Domain.Entities
 
         public Subject Subject { get; set; } = null!;
         public Professor Professor { get; set; } = null!;
+        public ICollection<AttendanceSession> AttendanceSessions { get; set; } = new List<AttendanceSession>();
     }
 }

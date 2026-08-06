@@ -30,6 +30,7 @@ public sealed class LectureRepository(DataContext dbContext) : ILectureRepositor
             .Include(lecture => lecture.Subject)
             .Include(lecture => lecture.Professor)
             .ThenInclude(professor => professor.User)
+            .Include(lecture => lecture.AttendanceSessions)
             .Where(lecture => lecture.StartsAt >= from &&
             lecture.StartsAt < until &&
             dbContext.Enrollments.Any(enrollment =>
