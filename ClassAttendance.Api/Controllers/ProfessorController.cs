@@ -1,4 +1,4 @@
-using ClassAttendance.Api.Authorization;
+﻿using ClassAttendance.Api.Authorization;
 using ClassAttendance.Application.Interfaces.Services;
 using ClassAttendance.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -17,7 +17,7 @@ public sealed class ProfessorController(IAttendanceService attendanceService) : 
     {
         try
         {
-            var attendances = await attendanceService.GetForProfessorSubjectAsync(
+            var attendances = await attendanceService.GetForProfessorSubject(
                 GetUserId(),
                 id,
                 cancellationToken);

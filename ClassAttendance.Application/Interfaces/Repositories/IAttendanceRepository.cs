@@ -17,5 +17,10 @@ namespace ClassAttendance.Application.Interfaces.Repositories
         Task AddAsync(Attendance attendance, CancellationToken cancellationToken = default);
 
         Task<IReadOnlyList<Attendance>> GetForSubject(int subjectId, CancellationToken cancellationToken = default);
+
+        Task<bool> IsSubjectTaughtByProfessor(
+            int subjectId,
+            int professorId,
+            CancellationToken cancellationToken = default);
     }
 }

@@ -113,7 +113,15 @@ namespace ClassAttendance.Infrastructure.Data
                 EndsAt = now.AddDays(1).Date.AddHours(12),
                 Rooms = "A2"
             };
-            db.Lectures.AddRange(lecture1, lecture2);
+            var lecture3 = new Lecture
+            {
+                SubjectId = subject1.Id,
+                ProfessorId = professor.UserId,
+                StartsAt = now.AddDays(2).Date.AddHours(8),
+                EndsAt = now.AddDays(2).Date.AddHours(10),
+                Rooms = "A1"
+            };
+            db.Lectures.AddRange(lecture1, lecture2, lecture3);
             await db.SaveChangesAsync(ct);
             var attendanceSession = new AttendanceSession
             {
@@ -122,7 +130,24 @@ namespace ClassAttendance.Infrastructure.Data
                 OpenUntil = now.AddMinutes(15),
                 WifiRequired = false
             };
-            db.AttendanceSessions.Add(attendanceSession);
+            var futureAttendanceSession = new AttendanceSession
+            {
+                LectureId = lecture2.Id,
+                OpenFrom = lecture2.StartsAt.AddMinutes(-15),
+                OpenUntil = lecture2.StartsAt.AddMinutes(15),
+                WifiRequired = false
+            };
+            var laterAttendanceSession = new AttendanceSession
+            {
+                LectureId = lecture3.Id,
+                OpenFrom = lecture3.StartsAt.AddMinutes(-15),
+                OpenUntil = lecture3.StartsAt.AddMinutes(15),
+                WifiRequired = false
+            };
+            db.AttendanceSessions.AddRange(
+                attendanceSession,
+                futureAttendanceSession,
+                laterAttendanceSession);
             await db.SaveChangesAsync(ct);
             db.Attendances.Add(new Attendance
             {
