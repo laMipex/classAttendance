@@ -1,14 +1,14 @@
 using ClassAttendance.Api.Authorization;
 using ClassAttendance.Api.Contracts.Attendance;
 using ClassAttendance.Application.Interfaces.Services;
-using ClassAttendance.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+
 namespace ClassAttendance.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("attendance")]
 [Authorize(Policy = AuthorizationPolicies.Student)]
 public sealed class AttendanceController(IAttendanceService attendanceService) : ControllerBase
 {
@@ -19,9 +19,9 @@ public sealed class AttendanceController(IAttendanceService attendanceService) :
     {
         try
         {
-            var result = await attendanceService.CheckInAsync(
+            var result = await attendanceService.CheckIn(
                 GetUserId(),
-                request.AttendenceSessionId,
+                request.AttendanceSessionId,
                 cancellationToken);
             return Ok(result);
         }

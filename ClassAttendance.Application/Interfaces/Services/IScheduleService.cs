@@ -8,7 +8,7 @@ namespace ClassAttendance.Application.Interfaces.Services;
 public interface IScheduleService
 {
     Task<IReadOnlyList<ScheduleLectureDto>> GetStudentSchedule(
-        int stundentId,
+        int studentId,
         DateTime from,
         DateTime until,
         CancellationToken cancellationToken = default);

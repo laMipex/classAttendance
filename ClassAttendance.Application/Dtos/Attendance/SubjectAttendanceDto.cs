@@ -5,8 +5,8 @@ using System.Text;
 
 namespace ClassAttendance.Application.Dtos.Attendance;
 
-public sealed class SubjectAttendanceDto(
-    int AttendaceId,
+public sealed record SubjectAttendanceDto(
+    int AttendanceId,
     int AttendanceSessionId,
     int LectureId,
     int StudentId,

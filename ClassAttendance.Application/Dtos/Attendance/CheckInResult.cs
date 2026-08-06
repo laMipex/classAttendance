@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ClassAttendance.Application.Dtos.Attendance;
 
-public sealed class CheckInResult(
+public sealed record CheckInResult(
     int AttendanceId,
     int AttendanceSessionId,
     DateTime CheckInAt,

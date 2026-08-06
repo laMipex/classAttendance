@@ -13,7 +13,11 @@ namespace ClassAttendance.Infrastructure.Data
         {
             await db.Database.MigrateAsync(ct);
             var alreadySeeded = await db.Users.AnyAsync(u => u.Email == "ivan.ivanovic@classattendance.com", ct);
-            if (alreadySeeded) return;
+            if (alreadySeeded)
+            {
+                await RefreshDemoAttendanceSessionAsync(db, ct);
+                return;
+            }
             var now = DateTime.UtcNow;
             var studyProgram = new StudyProgram
             {
@@ -157,6 +161,31 @@ namespace ClassAttendance.Infrastructure.Data
                 Method = "Manual",
                 Status = "Present"
             });
+            await db.SaveChangesAsync(ct);
+        }
+
+        private static async Task RefreshDemoAttendanceSessionAsync(
+            DataContext db,
+            CancellationToken ct)
+        {
+            var attendanceSession = await db.AttendanceSessions
+                .Include(session => session.Lecture)
+                    .ThenInclude(lecture => lecture.Subject)
+                .SingleOrDefaultAsync(
+                    session => session.Lecture.Subject.Code == "OOP1"
+                        && session.Lecture.Rooms == "A1",
+                    ct);
+
+            if (attendanceSession is null)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            attendanceSession.Lecture.StartsAt = now.AddHours(-1);
+            attendanceSession.Lecture.EndsAt = now.AddHours(1);
+            attendanceSession.OpenFrom = now.AddMinutes(-15);
+            attendanceSession.OpenUntil = now.AddMinutes(15);
             await db.SaveChangesAsync(ct);
         }
     }

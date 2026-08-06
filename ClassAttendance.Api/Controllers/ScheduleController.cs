@@ -1,6 +1,5 @@
 using ClassAttendance.Api.Authorization;
 using ClassAttendance.Application.Interfaces.Services;
-using ClassAttendance.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -8,25 +7,31 @@ using System.Security.Claims;
 namespace ClassAttendance.Api.Controllers;
 
 [ApiController]
-[Route("professor")]
-[Authorize(Policy = AuthorizationPolicies.Professor)]
-public sealed class ProfessorController(IAttendanceService attendanceService) : ControllerBase
+[Route("schedule")]
+[Authorize(Policy = AuthorizationPolicies.Student)]
+public sealed class ScheduleController(IScheduleService scheduleService) : ControllerBase
 {
-    [HttpGet("subjects/{id:int}/attendances")]
-    public async Task<ActionResult> GetSubjectAttendances(int id, CancellationToken cancellationToken)
+    [HttpGet("me")]
+    public async Task<ActionResult> GetMySchedule(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? until,
+        CancellationToken cancellationToken)
     {
-        try
+        var start = from ?? DateTime.UtcNow.Date;
+        var end = until ?? start.AddDays(7);
+
+        if (end <= start)
         {
-            var attendances = await attendanceService.GetForProfessorSubjectAsync(
-                GetUserId(),
-                id,
-                cancellationToken);
-            return Ok(attendances);
+            return BadRequest(new { error = "The schedule end must be after its start." });
         }
-        catch (UnauthorizedAccessException)
-        {
-            return Forbid();
-        }
+
+        var schedule = await scheduleService.GetStudentSchedule(
+            GetUserId(),
+            start,
+            end,
+            cancellationToken);
+
+        return Ok(schedule);
     }
 
     private int GetUserId() =>
