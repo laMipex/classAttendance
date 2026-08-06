@@ -113,7 +113,7 @@ public class DataContext : Microsoft.EntityFrameworkCore.DbContext
         // ----- AttendanceSession ------
         modelBuilder.Entity<AttendanceSession>()
             .HasOne(a => a.Lecture)
-            .WithMany()
+            .WithMany(lecture => lecture.AttendanceSessions)
             .HasForeignKey(a => a.LectureId)
             .OnDelete(DeleteBehavior.Cascade);
 

@@ -1,10 +1,10 @@
 ﻿using ClassAttendance.Domain.Entities;
 using ClassAttendance.Infrastructure.Persistence;
+using ClassAttendance.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Text;
-
 namespace ClassAttendance.Infrastructure.Data
 {
     public static class Seed
@@ -12,12 +12,13 @@ namespace ClassAttendance.Infrastructure.Data
         public static async Task SeedAsync(DataContext db, CancellationToken ct = default)
         {
             await db.Database.MigrateAsync(ct);
-
-            var alreadySeeded = await db.Users.AnyAsync(u => u.Email == "prof.demo@classattendance.local", ct);
-            if (alreadySeeded) return;
-
+            var alreadySeeded = await db.Users.AnyAsync(u => u.Email == "ivan.ivanovic@classattendance.com", ct);
+            if (alreadySeeded)
+            {
+                await RefreshDemoAttendanceSessionAsync(db, ct);
+                return;
+            }
             var now = DateTime.UtcNow;
-
             var studyProgram = new StudyProgram
             {
                 Name = "Informatika",
@@ -25,64 +26,55 @@ namespace ClassAttendance.Infrastructure.Data
             };
             db.StudyPrograms.Add(studyProgram);
             await db.SaveChangesAsync(ct);
-
             var professorUser = new User
             {
                 FirstName = "Ivan",
                 LastName = "Ivanović",
                 Email = "ivan.ivanovic@classattendance.com",
-                Password = "Prof123!", 
+                Password = PasswordHasher.HashPassword("Prof123!"),
                 Role = "Professor",
                 IsActive = true
             };
-
             var student1User = new User
             {
                 FirstName = "Marko",
                 LastName = "Marković",
                 Email = "marko.markovic@classattendance.com",
-                Password = "Student123!",
+                Password = PasswordHasher.HashPassword("Student123!"),
                 Role = "Student",
                 IsActive = true
             };
-
             var student2User = new User
             {
                 FirstName = "Ana",
                 LastName = "Nikolić",
                 Email = "ana.nikolic@classattendance.com",
-                Password = "Student123!",
+                Password = PasswordHasher.HashPassword("Student123!"),
                 Role = "Student",
                 IsActive = true
             };
-
             db.Users.AddRange(professorUser, student1User, student2User);
             await db.SaveChangesAsync(ct);
-
             var professor = new Professor
             {
-                UserId = professorUser.id,
+                UserId = professorUser.Id,
                 EmployeeCode = "EMP-0001"
             };
-
             var student1 = new Student
             {
-                UserId = student1User.id,
-                Index = "RA-001/26",
+                UserId = student1User.Id,
+                Index = "26122083",
                 StudyProgramId = studyProgram.Id
             };
-
             var student2 = new Student
             {
-                UserId = student2User.id,
-                Index = "RA-002/26",
+                UserId = student2User.Id,
+                Index = "26122035",
                 StudyProgramId = studyProgram.Id
             };
-
             db.Professors.Add(professor);
             db.Students.AddRange(student1, student2);
             await db.SaveChangesAsync(ct);
-
             var subject1 = new Subject
             {
                 Code = "OOP1",
@@ -90,7 +82,6 @@ namespace ClassAttendance.Infrastructure.Data
                 ETCS = 6,
                 Semester = 2
             };
-
             var subject2 = new Subject
             {
                 Code = "DB1",
@@ -98,22 +89,18 @@ namespace ClassAttendance.Infrastructure.Data
                 ETCS = 6,
                 Semester = 2
             };
-
             db.Subjects.AddRange(subject1, subject2);
             await db.SaveChangesAsync(ct);
-
             db.SubjectProfessors.AddRange(
                 new SubjectProfessor { SubjectId = subject1.Id, ProfessorId = professor.UserId },
                 new SubjectProfessor { SubjectId = subject2.Id, ProfessorId = professor.UserId }
             );
-
             db.Enrollments.AddRange(
                 new Enrollment { StudentId = student1.UserId, SubjectId = subject1.Id, AcademicYear = "2026/2027", Status = "Active" },
                 new Enrollment { StudentId = student1.UserId, SubjectId = subject2.Id, AcademicYear = "2026/2027", Status = "Active" },
                 new Enrollment { StudentId = student2.UserId, SubjectId = subject1.Id, AcademicYear = "2026/2027", Status = "Active" },
                 new Enrollment { StudentId = student2.UserId, SubjectId = subject2.Id, AcademicYear = "2026/2027", Status = "Active" }
             );
-
             var lecture1 = new Lecture
             {
                 SubjectId = subject1.Id,
@@ -122,7 +109,6 @@ namespace ClassAttendance.Infrastructure.Data
                 EndsAt = now.AddHours(1),
                 Rooms = "A1"
             };
-
             var lecture2 = new Lecture
             {
                 SubjectId = subject2.Id,
@@ -131,10 +117,16 @@ namespace ClassAttendance.Infrastructure.Data
                 EndsAt = now.AddDays(1).Date.AddHours(12),
                 Rooms = "A2"
             };
-
-            db.Lectures.AddRange(lecture1, lecture2);
+            var lecture3 = new Lecture
+            {
+                SubjectId = subject1.Id,
+                ProfessorId = professor.UserId,
+                StartsAt = now.AddDays(2).Date.AddHours(8),
+                EndsAt = now.AddDays(2).Date.AddHours(10),
+                Rooms = "A1"
+            };
+            db.Lectures.AddRange(lecture1, lecture2, lecture3);
             await db.SaveChangesAsync(ct);
-
             var attendanceSession = new AttendanceSession
             {
                 LectureId = lecture1.Id,
@@ -142,10 +134,25 @@ namespace ClassAttendance.Infrastructure.Data
                 OpenUntil = now.AddMinutes(15),
                 WifiRequired = false
             };
-
-            db.AttendanceSessions.Add(attendanceSession);
+            var futureAttendanceSession = new AttendanceSession
+            {
+                LectureId = lecture2.Id,
+                OpenFrom = lecture2.StartsAt.AddMinutes(-15),
+                OpenUntil = lecture2.StartsAt.AddMinutes(15),
+                WifiRequired = false
+            };
+            var laterAttendanceSession = new AttendanceSession
+            {
+                LectureId = lecture3.Id,
+                OpenFrom = lecture3.StartsAt.AddMinutes(-15),
+                OpenUntil = lecture3.StartsAt.AddMinutes(15),
+                WifiRequired = false
+            };
+            db.AttendanceSessions.AddRange(
+                attendanceSession,
+                futureAttendanceSession,
+                laterAttendanceSession);
             await db.SaveChangesAsync(ct);
-
             db.Attendances.Add(new Attendance
             {
                 AttendanceSessionId = attendanceSession.Id,
@@ -154,7 +161,31 @@ namespace ClassAttendance.Infrastructure.Data
                 Method = "Manual",
                 Status = "Present"
             });
+            await db.SaveChangesAsync(ct);
+        }
 
+        private static async Task RefreshDemoAttendanceSessionAsync(
+            DataContext db,
+            CancellationToken ct)
+        {
+            var attendanceSession = await db.AttendanceSessions
+                .Include(session => session.Lecture)
+                    .ThenInclude(lecture => lecture.Subject)
+                .SingleOrDefaultAsync(
+                    session => session.Lecture.Subject.Code == "OOP1"
+                        && session.Lecture.Rooms == "A1",
+                    ct);
+
+            if (attendanceSession is null)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            attendanceSession.Lecture.StartsAt = now.AddHours(-1);
+            attendanceSession.Lecture.EndsAt = now.AddHours(1);
+            attendanceSession.OpenFrom = now.AddMinutes(-15);
+            attendanceSession.OpenUntil = now.AddMinutes(15);
             await db.SaveChangesAsync(ct);
         }
     }

@@ -1,8 +1,15 @@
+using ClassAttendance.Api.Authorization;
 using ClassAttendance.Application.Interfaces.Repositories;
+using ClassAttendance.Application.Interfaces.Services;
 using ClassAttendance.Infrastructure.Data;
 using ClassAttendance.Infrastructure.Persistence;
 using ClassAttendance.Infrastructure.Repositories;
+using ClassAttendance.Infrastructure.Security;
+using ClassAttendance.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +24,38 @@ builder.Services.AddDbContext<DataContext>(options =>
 });
 builder.Services.AddScoped<IStudentRepository, StudentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
-builder.Services.AddScoped<ILectureRepository, LectureRepository>();    
+builder.Services.AddScoped<ILectureRepository, LectureRepository>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+
+var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? throw new InvalidOperationException("JWT configuration is missing.");
+jwtOptions.Validate();
+
+builder.Services.AddSingleton(jwtOptions);
+builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AuthorizationPolicies.Student, policy => policy.RequireRole("Student"));
+    options.AddPolicy(AuthorizationPolicies.Professor, policy => policy.RequireRole("Professor"));
+});
 
 
 var app = builder.Build();
@@ -37,6 +75,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

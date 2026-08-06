@@ -35,7 +35,19 @@ public sealed class AttendanceRepository(DataContext dbContext) : IAttendanceRep
     public async Task AddAsync(Attendance attendance, CancellationToken cancellationToken = default)
     {
         await dbContext.Attendances.AddAsync(attendance, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException?.Message.Contains(
+                "IX_Attendances_AttendanceSessionId_StudentId",
+                StringComparison.OrdinalIgnoreCase) == true)
+        {
+            throw new InvalidOperationException(
+                "Student has already checked in for this session.",
+                exception);
+        }
     }
     public async Task<IReadOnlyList<Attendance>> GetForSubject(
         int subjectId,
@@ -51,5 +63,16 @@ public sealed class AttendanceRepository(DataContext dbContext) : IAttendanceRep
             .Where(attendance => attendance.AttendanceSession.Lecture.SubjectId == subjectId)
             .OrderByDescending(attendance => attendance.CheckInAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> IsSubjectTaughtByProfessor(
+        int subjectId,
+        int professorId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.SubjectProfessors.AnyAsync(
+            assignment => assignment.SubjectId == subjectId
+                && assignment.ProfessorId == professorId,
+            cancellationToken);
     }
 }
