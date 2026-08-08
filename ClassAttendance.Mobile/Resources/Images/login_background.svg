@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 780" width="100%" height="100%">
+  <!-- White Background -->
+  <rect width="100%" height="100%" fill="#ffffff" />
+
+  <!-- Top Right Shapes -->
+  <!-- Dark Blue Offset Shape -->
+  <circle cx="355" cy="5" r="165" fill="#136A9E" />
+  <!-- Light Blue Main Shape -->
+  <circle cx="380" cy="-20" r="165" fill="#008ED6" />
+
+  <!-- Bottom Left Shapes -->
+  <!-- Using a group with stroke-linejoin="round" to perfectly replicate the rounded corners of the peaks -->
+  <g stroke-linejoin="round">
+    <!-- Dark Blue Polygon (Back) -->
+    <polygon 
+      points="-20,820 -20,700 150,630 260,820" 
+      fill="#136A9E" 
+      stroke="#136A9E" 
+      stroke-width="15" 
+    />
+    <!-- Light Blue Polygon (Front) -->
+    <polygon 
+      points="-20,820 -20,680 110,600 200,820" 
+      fill="#008ED6" 
+      stroke="#008ED6" 
+      stroke-width="15" 
+    />
+  </g>
+</svg>
