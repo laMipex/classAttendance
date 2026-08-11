@@ -19,85 +19,188 @@
                        Aspect="AspectFit"
                        Margin="0,16,0,52"
                        SemanticProperties.Description="VTS logo" />
-
-                <Border Stroke="#303030"
-                        StrokeThickness="1"
-                        StrokeShape="RoundRectangle 10"
-                        HeightRequest="64">
+                <Border Style="{StaticResource LoginFieldBorder}">
                     <Entry x:Name="IndexEntry"
                            Placeholder="Index"
                            Keyboard="Numeric"
                            MaxLength="8"
-                           FontSize="26"
+                           FontSize="24"
                            Margin="17,0" />
                 </Border>
-
-                <Border Stroke="#303030"
-                        StrokeThickness="1"
-                        StrokeShape="RoundRectangle 10"
-                        HeightRequest="64">
+                <Border Style="{StaticResource LoginFieldBorder}">
                     <Entry x:Name="EmailEntry"
                            Placeholder="Email"
                            Keyboard="Email"
-                           FontSize="26"
+                           FontSize="24"
                            Margin="17,0" />
                 </Border>
-
-                <Border Stroke="#303030"
-                        StrokeThickness="1"
-                        StrokeShape="RoundRectangle 10"
-                        HeightRequest="64">
+                <Border Style="{StaticResource LoginFieldBorder}">
                     <Entry x:Name="PasswordEntry"
                            Placeholder="Password"
                            IsPassword="True"
-                           FontSize="26"
+                           FontSize="24"
                            Margin="17,0" />
                 </Border>
-
                 <Label x:Name="ValidationMessage"
                        TextColor="#B42318"
                        FontSize="14"
-                       IsVisible="False"
-                       LineBreakMode="WordWrap" />
-
-                <Button x:Name="LoginButton"
-                        Text="Login"
+                       IsVisible="False" />
+                <Button Text="Login"
                         Clicked="OnLoginClicked"
-                        BackgroundColor="#0798DE"
-                        TextColor="White"
-                        FontFamily="RobotoBold"
-                        FontSize="20"
-                        CornerRadius="28"
-                        HeightRequest="54"
-                        WidthRequest="140"
-                        HorizontalOptions="Center"
+                        Style="{StaticResource PrimaryActionButton}"
                         Margin="0,26,0,0" />
             </VerticalStackLayout>
         </ScrollView>
 
-        <VerticalStackLayout IsVisible="{Binding IsHomeVisible}"
-                             Padding="22,52"
-                             Spacing="0">
-            <HorizontalStackLayout Spacing="8">
-                <Label Text="Welcome"
-                       FontSize="30"
-                       TextColor="Black" />
-                <Label x:Name="UserIdentifierLabel"
-                       FontSize="30"
-                       TextColor="#008FE0" />
-            </HorizontalStackLayout>
-        </VerticalStackLayout>
+        <Grid IsVisible="{Binding IsAppVisible}"
+              RowDefinitions="*,72"
+              BackgroundColor="#F7FAFC">
+            <Grid Grid.Row="0">
+                <ScrollView IsVisible="{Binding IsDashboardVisible}">
+                    <VerticalStackLayout Padding="24,40,24,24" Spacing="18">
+                        <Label Text="{Binding WelcomeText}" Style="{StaticResource ScreenTitle}" />
+                        <Label Text="{Binding RoleDescription}" Style="{StaticResource Subtitle}" />
 
-        <Grid IsVisible="{Binding IsLoginSubmitting}"
-              BackgroundColor="#80FFFFFF">
+                        <Border Style="{StaticResource StatusCard}">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="{Binding LessonStatusTitle}" Style="{StaticResource CardTitle}" />
+                                <Label Text="{Binding LessonStatusDetail}" Style="{StaticResource CardBody}" />
+                                <Label Text="{Binding LessonTime}" TextColor="#0798DE" FontFamily="RobotoBold" FontSize="16" />
+                                <Label Text="{Binding AttendanceAvailabilityMessage}"
+                                       IsVisible="{Binding IsStudent}"
+                                       Style="{StaticResource CardBody}" />
+                                <Button Text="{Binding AttendanceButtonText}"
+                                        Clicked="OnAttendanceClicked"
+                                        IsVisible="{Binding IsStudent}"
+                                        IsEnabled="{Binding IsAttendanceCheckInOpen}"
+                                        Style="{StaticResource PrimaryActionButton}"
+                                        HorizontalOptions="Start"
+                                        Margin="0,8,0,0" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <VerticalStackLayout IsVisible="{Binding IsStudent}" Spacing="10">
+                            <Label Text="Active quizzes" Style="{StaticResource SectionTitle}" />
+                            <CollectionView ItemsSource="{Binding StudentQuizzes}" SelectionMode="None">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource ListCard}">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <VerticalStackLayout Spacing="3">
+                                                    <Label Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                                    <Label Text="{Binding Detail}" Style="{StaticResource CardBody}" />
+                                                </VerticalStackLayout>
+                                                <Label Grid.Column="1" Text="›" FontSize="30" TextColor="#0798DE" VerticalOptions="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout IsVisible="{Binding IsProfessor}" Spacing="10">
+                            <Label Text="Quizzes" Style="{StaticResource SectionTitle}" />
+                            <Button Text="+ Create a quiz"
+                                    Clicked="OnCreateQuizClicked"
+                                    Style="{StaticResource PrimaryActionButton}"
+                                    HorizontalOptions="Start" />
+                            <CollectionView ItemsSource="{Binding ProfessorQuizzes}" SelectionMode="None">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource ListCard}">
+                                            <VerticalStackLayout Spacing="3">
+                                                <Label Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                                <Label Text="{Binding Detail}" Style="{StaticResource CardBody}" />
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <ScrollView IsVisible="{Binding IsScheduleVisible}">
+                    <VerticalStackLayout Padding="24,40,24,24" Spacing="14">
+                        <Label Text="Schedule" Style="{StaticResource ScreenTitle}" />
+                        <Label Text="{Binding ScheduleDescription}" Style="{StaticResource Subtitle}" />
+                        <CollectionView ItemsSource="{Binding ScheduleItems}" SelectionMode="None">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource ListCard}">
+                                        <Grid ColumnDefinitions="68,*">
+                                            <VerticalStackLayout>
+                                                <Label Text="{Binding Time}" TextColor="#0798DE" FontFamily="RobotoBold" FontSize="16" />
+                                                <Label Text="{Binding Day}" Style="{StaticResource CardBody}" />
+                                            </VerticalStackLayout>
+                                            <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                                <Label Text="{Binding Subject}" Style="{StaticResource CardTitle}" />
+                                                <Label Text="{Binding Detail}" Style="{StaticResource CardBody}" />
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <ScrollView IsVisible="{Binding IsProfileVisible}">
+                    <VerticalStackLayout Padding="24,40,24,24" Spacing="18">
+                        <Label Text="Profile" Style="{StaticResource ScreenTitle}" />
+                        <Border Style="{StaticResource StatusCard}">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="{Binding UserName}" Style="{StaticResource CardTitle}" FontSize="24" />
+                                <Label Text="{Binding UserRole}" TextColor="#0798DE" FontFamily="RobotoBold" FontSize="24" />
+                                <Label Text="{Binding UserIdentifier}" Style="{StaticResource CardBody}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Style="{StaticResource ListCard}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label Text="Account" Style="{StaticResource CardTitle}" />
+                                <Label Text="{Binding ProfileSummary}" Style="{StaticResource CardBody}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Button Text="Log out"
+                                Clicked="OnLogoutClicked"
+                                Style="{StaticResource OutlineActionButton}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <ScrollView IsVisible="{Binding IsQuizEditorVisible}">
+                    <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
+                        <Button Text="‹ Back to dashboard"
+                                Clicked="OnBackToDashboardClicked"
+                                Style="{StaticResource TextActionButton}"
+                                HorizontalOptions="Start" />
+                        <Label Text="Create quiz" Style="{StaticResource ScreenTitle}" />
+                        <Border Style="{StaticResource LoginFieldBorder}">
+                            <Entry x:Name="QuizTitleEntry" Placeholder="Quiz title" Margin="17,0" />
+                        </Border>
+                        <Border Style="{StaticResource LoginFieldBorder}" HeightRequest="120">
+                            <Editor x:Name="QuizQuestionEntry" Placeholder="Question" Margin="12,6" />
+                        </Border>
+                        <Button Text="Publish quiz"
+                                Clicked="OnPublishQuizClicked"
+                                Style="{StaticResource PrimaryActionButton}" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
+
+            <Grid Grid.Row="1" BackgroundColor="White" ColumnDefinitions="*,*,*" Padding="16,8">
+                <Button Text="Home" Clicked="OnDashboardClicked" Style="{StaticResource NavigationButton}" />
+                <Button Grid.Column="1" Text="Schedule" Clicked="OnScheduleClicked" Style="{StaticResource NavigationButton}" />
+                <Button Grid.Column="2" Text="Profile" Clicked="OnProfileClicked" Style="{StaticResource NavigationButton}" />
+            </Grid>
+        </Grid>
+
+        <Grid IsVisible="{Binding IsLoginSubmitting}" BackgroundColor="#80FFFFFF">
             <ActivityIndicator IsRunning="{Binding IsLoginSubmitting}"
-                               IsVisible="{Binding IsLoginSubmitting}"
                                Color="#0798DE"
                                WidthRequest="64"
                                HeightRequest="64"
                                HorizontalOptions="Center"
                                VerticalOptions="Center" />
         </Grid>
-
     </Grid>
 </ContentPage>
