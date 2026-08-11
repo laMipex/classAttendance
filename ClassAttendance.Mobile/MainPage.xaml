@@ -151,7 +151,7 @@
                         <Border Style="{StaticResource StatusCard}">
                             <VerticalStackLayout Spacing="6">
                                 <Label Text="{Binding UserName}" Style="{StaticResource CardTitle}" FontSize="24" />
-                                <Label Text="{Binding UserRole}" TextColor="#0798DE" FontFamily="RobotoBold" FontSize="24" />
+                                <Label Text="{Binding UserRole}" TextColor="#0798DE" FontFamily="RobotoBold" />
                                 <Label Text="{Binding UserIdentifier}" Style="{StaticResource CardBody}" />
                             </VerticalStackLayout>
                         </Border>
@@ -174,6 +174,10 @@
                                 Style="{StaticResource TextActionButton}"
                                 HorizontalOptions="Start" />
                         <Label Text="Create quiz" Style="{StaticResource ScreenTitle}" />
+                        <Picker x:Name="QuizLecturePicker"
+                                Title="Choose class"
+                                ItemsSource="{Binding ProfessorLectures}"
+                                ItemDisplayBinding="{Binding DisplayName}" />
                         <Border Style="{StaticResource LoginFieldBorder}">
                             <Entry x:Name="QuizTitleEntry" Placeholder="Quiz title" Margin="17,0" />
                         </Border>

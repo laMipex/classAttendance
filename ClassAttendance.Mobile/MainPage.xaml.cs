@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using ClassAttendance.Mobile.Services;
 
 namespace ClassAttendance.Mobile;
 
@@ -10,6 +11,7 @@ public partial class MainPage : ContentPage
     private bool _isLoginSubmitting;
     private bool _isStudent;
     private bool _isAttendanceConfirmed;
+    private readonly ClassAttendanceApiClient _apiClient = new();
 
     public MainPage()
     {
@@ -17,17 +19,11 @@ public partial class MainPage : ContentPage
         BindingContext = this;
     }
 
-    public ObservableCollection<QuizItem> StudentQuizzes { get; } =
-    [
-        new("C# fundamentals", "5 questions · 8 minutes"),
-        new("Database normalization", "8 questions · Due today")
-    ];
+    public ObservableCollection<QuizItem> StudentQuizzes { get; } = [];
 
-    public ObservableCollection<QuizItem> ProfessorQuizzes { get; } =
-    [
-        new("C# fundamentals", "Published · 18 responses"),
-        new("Database normalization", "Draft")
-    ];
+    public ObservableCollection<QuizItem> ProfessorQuizzes { get; } = [];
+
+    public ObservableCollection<LectureResponse> ProfessorLectures { get; } = [];
 
     public ObservableCollection<ScheduleItem> ScheduleItems { get; } =
     [
@@ -103,13 +99,30 @@ public partial class MainPage : ContentPage
 
         try
         {
-            await Task.Delay(250);
-            _isStudent = index.Length > 0;
+            var loginResult = await _apiClient.LoginAsync(
+                index.Length > 0 ? index : null,
+                email.Length > 0 ? email : null,
+                password,
+                CancellationToken.None);
+
+            if (loginResult is null)
+            {
+                ShowValidationMessage("Incorrect index/email or password.");
+                return;
+            }
+
+            _isStudent = loginResult.Role == "Student";
+            _apiClient.SetAuthorization(loginResult.Token);
             UserIdentifier = _isStudent ? index : email;
-            UserName = _isStudent ? $"Student {index}" : email.Split('@')[0];
+            UserName = loginResult.FirstName;
             _activeSection = AppSection.Dashboard;
             IsAppVisible = true;
+            await LoadQuizzesAsync();
             NotifyAppStateChanged();
+        }
+        catch (HttpRequestException)
+        {
+            ShowValidationMessage("Unable to reach the server. Start the API and check the configured address.");
         }
         finally
         {
@@ -132,23 +145,50 @@ public partial class MainPage : ContentPage
     private void OnDashboardClicked(object? sender, EventArgs e) => ShowSection(AppSection.Dashboard);
     private void OnScheduleClicked(object? sender, EventArgs e) => ShowSection(AppSection.Schedule);
     private void OnProfileClicked(object? sender, EventArgs e) => ShowSection(AppSection.Profile);
-    private void OnCreateQuizClicked(object? sender, EventArgs e) => ShowSection(AppSection.QuizEditor);
+    private async void OnCreateQuizClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            ProfessorLectures.Clear();
+            foreach (var lecture in await _apiClient.GetProfessorLecturesAsync(CancellationToken.None))
+            {
+                ProfessorLectures.Add(lecture);
+            }
+
+            ShowSection(AppSection.QuizEditor);
+        }
+        catch (HttpRequestException)
+        {
+            await DisplayAlertAsync("Unable to load classes", "The server could not be reached.", "OK");
+        }
+    }
     private void OnBackToDashboardClicked(object? sender, EventArgs e) => ShowSection(AppSection.Dashboard);
 
-    private void OnPublishQuizClicked(object? sender, EventArgs e)
+    private async void OnPublishQuizClicked(object? sender, EventArgs e)
     {
         var title = QuizTitleEntry.Text?.Trim();
         var question = QuizQuestionEntry.Text?.Trim();
+        var lecture = QuizLecturePicker.SelectedItem as LectureResponse;
 
-        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(question))
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(question) || lecture is null)
         {
+            await DisplayAlertAsync("Missing information", "Choose a class and enter a quiz title and question.", "OK");
             return;
         }
 
-        ProfessorQuizzes.Insert(0, new QuizItem(title, "Published · 0 responses"));
-        QuizTitleEntry.Text = string.Empty;
-        QuizQuestionEntry.Text = string.Empty;
-        ShowSection(AppSection.Dashboard);
+        try
+        {
+            await _apiClient.CreateQuizAsync(new CreateQuizRequest(lecture.Id, title, question), CancellationToken.None);
+            QuizTitleEntry.Text = string.Empty;
+            QuizQuestionEntry.Text = string.Empty;
+            QuizLecturePicker.SelectedItem = null;
+            await LoadQuizzesAsync();
+            ShowSection(AppSection.Dashboard);
+        }
+        catch (HttpRequestException)
+        {
+            await DisplayAlertAsync("Unable to publish quiz", "The server could not be reached.", "OK");
+        }
     }
 
     private void OnLogoutClicked(object? sender, EventArgs e)
@@ -167,6 +207,24 @@ public partial class MainPage : ContentPage
     {
         _activeSection = section;
         NotifyAppStateChanged();
+    }
+
+    private async Task LoadQuizzesAsync()
+    {
+        var target = IsStudent ? StudentQuizzes : ProfessorQuizzes;
+        target.Clear();
+
+        var quizzes = IsStudent
+            ? await _apiClient.GetStudentQuizzesAsync(CancellationToken.None)
+            : await _apiClient.GetProfessorQuizzesAsync(CancellationToken.None);
+
+        foreach (var quiz in quizzes)
+        {
+            var detail = IsStudent
+                ? $"{quiz.SubjectName} · {quiz.QuestionCount} question(s)"
+                : $"{quiz.SubjectName} · {quiz.QuestionCount} question(s)";
+            target.Add(new QuizItem(quiz.Title, detail));
+        }
     }
 
     private void ShowValidationMessage(string message)
