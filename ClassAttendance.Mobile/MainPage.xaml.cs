@@ -40,6 +40,10 @@ public partial class MainPage : ContentPage
     public bool IsScheduleVisible => IsAppVisible && _activeSection == AppSection.Schedule;
     public bool IsProfileVisible => IsAppVisible && _activeSection == AppSection.Profile;
     public bool IsQuizEditorVisible => IsAppVisible && _activeSection == AppSection.QuizEditor;
+    public bool IsQuizAnswerVisible => IsAppVisible && _activeSection == AppSection.QuizAnswer;
+    public bool IsQuizResponsesVisible => IsAppVisible && _activeSection == AppSection.QuizResponses;
+    public bool IsTextAnswerVisible { get; private set; }
+    public bool IsChoiceAnswerVisible { get; private set; }
     public bool IsLoginSubmitting
     {
         get => _isLoginSubmitting;
@@ -63,6 +67,13 @@ public partial class MainPage : ContentPage
             : "Attendance can be confirmed only while the class attendance session is open.";
     public string ScheduleDescription => IsStudent ? "All classes for your programme." : "Your teaching schedule.";
     public string ProfileSummary => IsStudent ? "Student account · Class attendance enabled" : "Professor account · Quiz publishing enabled";
+    public QuizQuestionResponse? ActiveQuestion { get; private set; }
+    private int _activeQuizId;
+    public ObservableCollection<QuizOptionResponse> ActiveOptions { get; } = [];
+    public string AnswerText { get; set; } = string.Empty;
+    public QuizOptionResponse? SelectedOption { get; set; }
+    public string ActiveQuizTitle { get; private set; } = string.Empty;
+    public ObservableCollection<QuizQuestionResponsesResponse> ActiveQuizResponses { get; } = [];
 
     private async void OnLoginClicked(object? sender, EventArgs e)
     {
@@ -164,6 +175,56 @@ public partial class MainPage : ContentPage
     }
     private void OnBackToDashboardClicked(object? sender, EventArgs e) => ShowSection(AppSection.Dashboard);
 
+    private async void OnStudentQuizTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not BindableObject { BindingContext: QuizItem quiz })
+        {
+            return;
+        }
+
+        var details = await _apiClient.GetQuizDetailsAsync(quiz.Id, CancellationToken.None);
+        _activeQuizId = quiz.Id;
+        ActiveQuestion = details.Questions.SingleOrDefault();
+        if (ActiveQuestion is null)
+        {
+            return;
+        }
+
+        AnswerText = ActiveQuestion.AnswerText ?? string.Empty;
+        SelectedOption = ActiveQuestion.Options.FirstOrDefault(option => option.Id == ActiveQuestion.SelectedOptionId);
+        ActiveOptions.Clear();
+        foreach (var option in ActiveQuestion.Options)
+        {
+            ActiveOptions.Add(option);
+        }
+        IsTextAnswerVisible = ActiveQuestion.Type == "Text";
+        IsChoiceAnswerVisible = ActiveQuestion.Type == "Choice";
+        ShowSection(AppSection.QuizAnswer);
+        OnPropertyChanged(nameof(AnswerText));
+        OnPropertyChanged(nameof(SelectedOption));
+        OnPropertyChanged(nameof(IsTextAnswerVisible));
+        OnPropertyChanged(nameof(IsChoiceAnswerVisible));
+    }
+
+    private async void OnProfessorQuizTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not BindableObject { BindingContext: QuizItem quiz })
+        {
+            return;
+        }
+
+        var details = await _apiClient.GetQuizResponsesAsync(quiz.Id, CancellationToken.None);
+        ActiveQuizTitle = details.Title;
+        ActiveQuizResponses.Clear();
+        foreach (var question in details.Questions)
+        {
+            ActiveQuizResponses.Add(question);
+        }
+
+        ShowSection(AppSection.QuizResponses);
+        OnPropertyChanged(nameof(ActiveQuizTitle));
+    }
+
     private async void OnPublishQuizClicked(object? sender, EventArgs e)
     {
         var title = QuizTitleEntry.Text?.Trim();
@@ -178,7 +239,18 @@ public partial class MainPage : ContentPage
 
         try
         {
-            await _apiClient.CreateQuizAsync(new CreateQuizRequest(lecture.Id, title, question), CancellationToken.None);
+            var questionType = QuizTypePicker.SelectedItem as string ?? "Text";
+            var options = (QuizOptionsEntry.Text ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(option => new CreateQuizOptionRequest(option, false))
+                .ToArray();
+            if (questionType == "Choice" && options.Length < 2)
+            {
+                await DisplayAlertAsync("Missing options", "Enter at least two comma-separated options.", "OK");
+                return;
+            }
+
+            await _apiClient.CreateQuizAsync(new CreateQuizRequest(lecture.Id, title, question, questionType, options), CancellationToken.None);
             QuizTitleEntry.Text = string.Empty;
             QuizQuestionEntry.Text = string.Empty;
             QuizLecturePicker.SelectedItem = null;
@@ -188,6 +260,46 @@ public partial class MainPage : ContentPage
         catch (HttpRequestException)
         {
             await DisplayAlertAsync("Unable to publish quiz", "The server could not be reached.", "OK");
+        }
+    }
+
+    private async void OnSubmitQuizClicked(object? sender, EventArgs e)
+    {
+        if (ActiveQuestion is null)
+        {
+            return;
+        }
+
+        await _apiClient.SubmitQuizAsync(
+            _activeQuizId,
+            new SubmitQuizRequest(
+            [
+                new QuizAnswerRequest(
+                    ActiveQuestion.Id,
+                    IsTextAnswerVisible ? AnswerText : null,
+                    IsChoiceAnswerVisible ? SelectedOption?.Id : null)
+            ]),
+            CancellationToken.None);
+        await DisplayAlertAsync("Quiz submitted", "Your answer was sent.", "OK");
+        ShowSection(AppSection.Dashboard);
+    }
+
+    private async void OnQuizVisibilityClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { BindingContext: QuizItem quiz })
+        {
+            await _apiClient.SetQuizVisibilityAsync(quiz.Id, !quiz.IsVisible, CancellationToken.None);
+            await LoadQuizzesAsync();
+        }
+    }
+
+    private async void OnDeleteQuizClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { BindingContext: QuizItem quiz }
+            && await DisplayAlertAsync("Delete quiz", "Delete this quiz permanently?", "Delete", "Cancel"))
+        {
+            await _apiClient.DeleteQuizAsync(quiz.Id, CancellationToken.None);
+            await LoadQuizzesAsync();
         }
     }
 
@@ -220,10 +332,8 @@ public partial class MainPage : ContentPage
 
         foreach (var quiz in quizzes)
         {
-            var detail = IsStudent
-                ? $"{quiz.SubjectName} · {quiz.QuestionCount} question(s)"
-                : $"{quiz.SubjectName} · {quiz.QuestionCount} question(s)";
-            target.Add(new QuizItem(quiz.Title, detail));
+            var detail = $"{quiz.SubjectName} · {quiz.QuestionCount} question(s)";
+            target.Add(new QuizItem(quiz.Id, quiz.Title, detail, quiz.IsVisible));
         }
     }
 
@@ -243,6 +353,8 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(IsScheduleVisible));
         OnPropertyChanged(nameof(IsProfileVisible));
         OnPropertyChanged(nameof(IsQuizEditorVisible));
+        OnPropertyChanged(nameof(IsQuizAnswerVisible));
+        OnPropertyChanged(nameof(IsQuizResponsesVisible));
         OnPropertyChanged(nameof(UserRole));
         OnPropertyChanged(nameof(WelcomeText));
         OnPropertyChanged(nameof(RoleDescription));
@@ -271,9 +383,15 @@ public partial class MainPage : ContentPage
         Dashboard,
         Schedule,
         Profile,
-        QuizEditor
+        QuizEditor,
+        QuizAnswer,
+        QuizResponses
     }
 
-    public sealed record QuizItem(string Title, string Detail);
+    public sealed record QuizItem(int Id, string Title, string Detail, bool IsVisible)
+    {
+        public string VisibilityText => IsVisible ? "Visible to students" : "Hidden from students";
+        public string VisibilityColor => IsVisible ? "#16803C" : "#B54708";
+    }
     public sealed record ScheduleItem(string Time, string Day, string Subject, string Detail);
 }

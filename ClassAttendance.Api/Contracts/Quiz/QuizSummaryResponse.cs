@@ -7,5 +7,6 @@ public sealed record QuizSummaryResponse(
     string SubjectName,
     DateTime StartsAt,
     DateTime EndsAt,
-    int QuestionCount
+    int QuestionCount,
+    bool IsVisible
 );
