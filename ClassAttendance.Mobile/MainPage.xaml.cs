@@ -11,6 +11,9 @@ public partial class MainPage : ContentPage
     private bool _isLoginSubmitting;
     private bool _isStudent;
     private bool _isAttendanceConfirmed;
+    private int? _activeAttendanceSessionId;
+    private int? _editingLectureId;
+    private ScheduleLectureResponse? _nextLecture;
     private readonly ClassAttendanceApiClient _apiClient = new();
 
     public MainPage()
@@ -25,12 +28,8 @@ public partial class MainPage : ContentPage
 
     public ObservableCollection<LectureResponse> ProfessorLectures { get; } = [];
 
-    public ObservableCollection<ScheduleItem> ScheduleItems { get; } =
-    [
-        new("09:00", "Mon", "Software engineering", "Room 204 · Prof. Jovanović"),
-        new("11:00", "Tue", "Databases", "Room 102 · Prof. Marković"),
-        new("13:00", "Wed", "Mobile development", "Lab 3 · Prof. Petrović")
-    ];
+    public ObservableCollection<ScheduleItem> ScheduleItems { get; } = [];
+    public ObservableCollection<ScheduleLectureResponse> EditableLectures { get; } = [];
 
     public bool IsLoginVisible => !IsAppVisible;
     public bool IsAppVisible { get; private set; }
@@ -42,6 +41,7 @@ public partial class MainPage : ContentPage
     public bool IsQuizEditorVisible => IsAppVisible && _activeSection == AppSection.QuizEditor;
     public bool IsQuizAnswerVisible => IsAppVisible && _activeSection == AppSection.QuizAnswer;
     public bool IsQuizResponsesVisible => IsAppVisible && _activeSection == AppSection.QuizResponses;
+    public bool IsLectureEditorVisible => IsProfessor && _editingLectureId is not null;
     public bool IsTextAnswerVisible { get; private set; }
     public bool IsChoiceAnswerVisible { get; private set; }
     public bool IsLoginSubmitting
@@ -55,9 +55,13 @@ public partial class MainPage : ContentPage
     public string UserRole => IsStudent ? "Student" : "Professor";
     public string WelcomeText => $"Welcome, {UserName}";
     public string RoleDescription => IsStudent ? "Here is your class overview for today." : "Here is your teaching overview for today.";
-    public string LessonStatusTitle => IsStudent ? "Your next class starts soon" : "Your next class starts soon";
-    public string LessonStatusDetail => IsStudent ? "Software engineering · Room 204" : "Software engineering · Room 204";
-    public string LessonTime => "Today · 09:00 - 10:30";
+    public string LessonStatusTitle => _nextLecture is null ? "No upcoming classes" : "Your next class starts soon";
+    public string LessonStatusDetail => _nextLecture is null
+        ? "Your schedule is currently empty."
+        : $"{_nextLecture.SubjectName} · {_nextLecture.Room ?? "No room"}";
+    public string LessonTime => _nextLecture is null
+        ? string.Empty
+        : $"{_nextLecture.StartsAt.ToLocalTime():dd-MM-yyyy HH:mm} - {_nextLecture.EndsAt.ToLocalTime():HH:mm}";
     public string AttendanceButtonText => _isAttendanceConfirmed ? "Attendance confirmed" : "Confirm attendance";
     public bool IsAttendanceCheckInOpen { get; private set; }
     public string AttendanceAvailabilityMessage => _isAttendanceConfirmed
@@ -128,6 +132,11 @@ public partial class MainPage : ContentPage
             UserName = loginResult.FirstName;
             _activeSection = AppSection.Dashboard;
             IsAppVisible = true;
+            await LoadScheduleAsync();
+            if (_isStudent)
+            {
+                await LoadAttendanceSessionAsync();
+            }
             await LoadQuizzesAsync();
             NotifyAppStateChanged();
         }
@@ -141,20 +150,100 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void OnAttendanceClicked(object? sender, EventArgs e)
+    private async void OnAttendanceClicked(object? sender, EventArgs e)
     {
-        if (!IsAttendanceCheckInOpen)
+        if (!IsAttendanceCheckInOpen || _activeAttendanceSessionId is not int attendanceSessionId)
         {
             return;
         }
 
-        _isAttendanceConfirmed = true;
-        OnPropertyChanged(nameof(AttendanceButtonText));
-        OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
+        try
+        {
+            await _apiClient.CheckInAsync(attendanceSessionId, CancellationToken.None);
+            _isAttendanceConfirmed = true;
+            IsAttendanceCheckInOpen = false;
+            OnPropertyChanged(nameof(AttendanceButtonText));
+            OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
+            OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
+        }
+        catch (AttendanceAlreadyConfirmedException)
+        {
+            _isAttendanceConfirmed = true;
+            IsAttendanceCheckInOpen = false;
+            OnPropertyChanged(nameof(AttendanceButtonText));
+            OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
+            OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
+        }
+        catch (HttpRequestException exception)
+        {
+            await DisplayAlertAsync(
+                "Attendance could not be confirmed",
+                exception.Message,
+                "OK");
+        }
     }
 
     private void OnDashboardClicked(object? sender, EventArgs e) => ShowSection(AppSection.Dashboard);
     private void OnScheduleClicked(object? sender, EventArgs e) => ShowSection(AppSection.Schedule);
+    private void OnEditLectureClicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button { BindingContext: ScheduleLectureResponse lecture })
+        {
+            return;
+        }
+
+        _editingLectureId = lecture.Id;
+        var startsAt = lecture.StartsAt.ToLocalTime();
+        var endsAt = lecture.EndsAt.ToLocalTime();
+        LectureDatePicker.Date = startsAt.Date;
+        LectureStartTimePicker.Time = startsAt.TimeOfDay;
+        LectureEndTimePicker.Time = endsAt.TimeOfDay;
+        LectureRoomEntry.Text = lecture.Room;
+        OnPropertyChanged(nameof(IsLectureEditorVisible));
+    }
+
+    private async void OnSaveLectureClicked(object? sender, EventArgs e)
+    {
+        if (_editingLectureId is not int lectureId
+            || LectureDatePicker.Date is not DateTime date
+            || LectureStartTimePicker.Time is not TimeSpan startTime
+            || LectureEndTimePicker.Time is not TimeSpan endTime)
+        {
+            return;
+        }
+
+        var startsAt = DateTime.SpecifyKind(date.Date.Add(startTime), DateTimeKind.Local);
+        var endsAt = DateTime.SpecifyKind(date.Date.Add(endTime), DateTimeKind.Local);
+        if (endsAt <= startsAt)
+        {
+            await DisplayAlertAsync("Invalid time", "End time must be after start time.", "OK");
+            return;
+        }
+
+        try
+        {
+            await _apiClient.UpdateLectureAsync(
+                lectureId,
+                startsAt.ToUniversalTime(),
+                endsAt.ToUniversalTime(),
+                LectureRoomEntry.Text?.Trim(),
+                CancellationToken.None);
+            _editingLectureId = null;
+            OnPropertyChanged(nameof(IsLectureEditorVisible));
+            await LoadScheduleAsync();
+            await DisplayAlertAsync("Saved", "Lecture schedule was updated.", "OK");
+        }
+        catch (HttpRequestException exception)
+        {
+            await DisplayAlertAsync("Unable to save", exception.Message, "OK");
+        }
+    }
+
+    private void OnCancelLectureClicked(object? sender, EventArgs e)
+    {
+        _editingLectureId = null;
+        OnPropertyChanged(nameof(IsLectureEditorVisible));
+    }
     private void OnProfileClicked(object? sender, EventArgs e) => ShowSection(AppSection.Profile);
     private async void OnCreateQuizClicked(object? sender, EventArgs e)
     {
@@ -306,7 +395,8 @@ public partial class MainPage : ContentPage
     private void OnLogoutClicked(object? sender, EventArgs e)
     {
         IsAppVisible = false;
-        _isAttendanceConfirmed = false;
+        _activeAttendanceSessionId = null;
+        _editingLectureId = null;
         IsAttendanceCheckInOpen = false;
         IndexEntry.Text = string.Empty;
         EmailEntry.Text = string.Empty;
@@ -337,6 +427,62 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private async Task LoadAttendanceSessionAsync()
+    {
+        var now = DateTime.UtcNow;
+        var lectures = await _apiClient.GetStudentScheduleAsync(
+            now.Date,
+            now.Date.AddDays(1),
+            CancellationToken.None);
+        var activeSession = lectures
+            .SelectMany(lecture => lecture.AttendanceSessions)
+            .FirstOrDefault(session => now >= session.OpenFrom && now <= session.OpenUntil);
+
+        _activeAttendanceSessionId = activeSession?.Id;
+        IsAttendanceCheckInOpen = activeSession is not null;
+        _isAttendanceConfirmed = activeSession is not null
+            && await _apiClient.GetMyCheckIn(activeSession.Id, CancellationToken.None) is not null;
+        if (_isAttendanceConfirmed)
+        {
+            IsAttendanceCheckInOpen = false;
+        }
+
+        OnPropertyChanged(nameof(AttendanceButtonText));
+        OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
+        OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
+    }
+
+    private async Task LoadScheduleAsync()
+    {
+        var now = DateTime.UtcNow;
+        var lectures = IsStudent
+            ? await _apiClient.GetStudentScheduleAsync(now.Date, now.Date.AddDays(30), CancellationToken.None)
+            : await _apiClient.GetProfessorScheduleAsync(CancellationToken.None);
+
+        ScheduleItems.Clear();
+        EditableLectures.Clear();
+        _nextLecture = lectures
+            .Where(lecture => lecture.EndsAt >= now)
+            .OrderBy(lecture => lecture.StartsAt)
+            .FirstOrDefault();
+        foreach (var lecture in lectures)
+        {
+            ScheduleItems.Add(new ScheduleItem(
+                lecture.StartsAt.ToLocalTime().ToString("HH:mm"),
+                lecture.StartsAt.ToLocalTime().ToString("ddd"),
+                lecture.SubjectName,
+                $"{lecture.Room ?? "No room"} · {lecture.ProfessorName}"));
+            if (IsProfessor)
+            {
+                EditableLectures.Add(lecture);
+            }
+        }
+
+        OnPropertyChanged(nameof(LessonStatusTitle));
+        OnPropertyChanged(nameof(LessonStatusDetail));
+        OnPropertyChanged(nameof(LessonTime));
+    }
+
     private void ShowValidationMessage(string message)
     {
         ValidationMessage.Text = message;
@@ -355,11 +501,13 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(IsQuizEditorVisible));
         OnPropertyChanged(nameof(IsQuizAnswerVisible));
         OnPropertyChanged(nameof(IsQuizResponsesVisible));
+        OnPropertyChanged(nameof(IsLectureEditorVisible));
         OnPropertyChanged(nameof(UserRole));
         OnPropertyChanged(nameof(WelcomeText));
         OnPropertyChanged(nameof(RoleDescription));
         OnPropertyChanged(nameof(ScheduleDescription));
         OnPropertyChanged(nameof(ProfileSummary));
+        OnPropertyChanged(nameof(AttendanceButtonText));
         OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
         OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
     }

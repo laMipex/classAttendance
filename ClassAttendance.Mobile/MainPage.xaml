@@ -153,6 +153,52 @@
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>
                         </CollectionView>
+                        <VerticalStackLayout IsVisible="{Binding IsProfessor}" Spacing="10">
+                            <Label Text="Manage schedule" Style="{StaticResource SectionTitle}" />
+                            <CollectionView ItemsSource="{Binding EditableLectures}" SelectionMode="None">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource ListCard}">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <VerticalStackLayout Spacing="3">
+                                                    <Label Text="{Binding SubjectName}" Style="{StaticResource CardTitle}" />
+                                                    <Label Text="{Binding StartsAt, StringFormat='{0:dd-MM-yyyy HH:mm}'}"
+                                                           Style="{StaticResource CardBody}" />
+                                                    <Label Text="{Binding Room}" Style="{StaticResource CardBody}" />
+                                                </VerticalStackLayout>
+                                                <Button Grid.Column="1" Text="Edit"
+                                                        Clicked="OnEditLectureClicked"
+                                                        Style="{StaticResource TextActionButton}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+                            <Border IsVisible="{Binding IsLectureEditorVisible}" Style="{StaticResource StatusCard}">
+                                <VerticalStackLayout Spacing="10">
+                                    <Label Text="Edit lecture" Style="{StaticResource CardTitle}" />
+                                    <DatePicker x:Name="LectureDatePicker"
+                                                Format="dd-MM-yyyy" />
+                                    <TimePicker x:Name="LectureStartTimePicker"
+                                                Format="HH:mm" />
+                                    <TimePicker x:Name="LectureEndTimePicker"
+                                                Format="HH:mm" />
+                                    <Border Style="{StaticResource LoginFieldBorder}">
+                                        <Entry x:Name="LectureRoomEntry"
+                                               Placeholder="Room"
+                                               Margin="17,0" />
+                                    </Border>
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Button Text="Save"
+                                                Clicked="OnSaveLectureClicked"
+                                                Style="{StaticResource PrimaryActionButton}" />
+                                        <Button Text="Cancel"
+                                                Clicked="OnCancelLectureClicked"
+                                                Style="{StaticResource OutlineActionButton}" />
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                            </Border>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </ScrollView>
 

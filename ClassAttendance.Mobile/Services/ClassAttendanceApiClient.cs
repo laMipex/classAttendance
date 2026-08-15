@@ -45,6 +45,71 @@ public sealed class ClassAttendanceApiClient
     public async Task<IReadOnlyList<LectureResponse>> GetProfessorLecturesAsync(CancellationToken cancellationToken) =>
         await GetAsync<List<LectureResponse>>("quiz/lectures", cancellationToken);
 
+    public async Task<IReadOnlyList<ScheduleLectureResponse>> GetProfessorScheduleAsync(
+        CancellationToken cancellationToken) =>
+        await GetAsync<List<ScheduleLectureResponse>>("professor/schedule", cancellationToken);
+
+    public async Task UpdateLectureAsync(
+        int lectureId,
+        DateTime startsAt,
+        DateTime endsAt,
+        string? room,
+        CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.PutAsJsonAsync(
+            $"professor/schedule/{lectureId}",
+            new UpdateLectureRequest(startsAt, endsAt, room),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<IReadOnlyList<ScheduleLectureResponse>> GetStudentScheduleAsync(
+        DateTime from,
+        DateTime until,
+        CancellationToken cancellationToken)
+    {
+        var path = $"schedule/me?from={Uri.EscapeDataString(from.ToString("O"))}&until={Uri.EscapeDataString(until.ToString("O"))}";
+        return await GetAsync<List<ScheduleLectureResponse>>(path, cancellationToken);
+    }
+
+    public async Task<CheckInResponse> CheckInAsync(
+        int attendanceSessionId,
+        CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            "attendance/check-in",
+            new CheckInRequest(attendanceSessionId),
+            cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (error.Contains("already checked in", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new AttendanceAlreadyConfirmedException();
+            }
+        }
+
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CheckInResponse>(cancellationToken))!;
+    }
+
+    public async Task<CheckInResponse?> GetMyCheckIn(
+        int attendanceSessionId,
+        CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.GetAsync(
+            $"attendance/sessions/{attendanceSessionId}/me",
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CheckInResponse>(cancellationToken);
+    }
+
     public async Task<QuizResponse> CreateQuizAsync(CreateQuizRequest request, CancellationToken cancellationToken)
     {
         var response = await _httpClient.PostAsJsonAsync("quiz", request, cancellationToken);
@@ -108,3 +173,19 @@ public sealed record QuizStudentResponse(int StudentId, string StudentIndex, str
 public sealed record SubmitQuizRequest(IReadOnlyList<QuizAnswerRequest> Answers);
 public sealed record QuizAnswerRequest(int QuestionId, string? AnswerText, int? SelectedOptionId);
 public sealed record SetQuizVisibilityRequest(bool IsVisible);
+public sealed record CheckInRequest(int AttendanceSessionId);
+public sealed record CheckInResponse(int AttendanceId, int AttendanceSessionId, DateTime CheckInAt, string Status);
+public sealed record ScheduleLectureResponse(
+    int Id,
+    int SubjectId,
+    string SubjectCode,
+    string SubjectName,
+    string ProfessorName,
+    DateTime StartsAt,
+    DateTime EndsAt,
+    string? Room,
+    IReadOnlyList<ScheduleAttendanceSessionResponse> AttendanceSessions);
+public sealed record ScheduleAttendanceSessionResponse(int Id, DateTime OpenFrom, DateTime OpenUntil);
+public sealed record UpdateLectureRequest(DateTime StartsAt, DateTime EndsAt, string? Room);
+
+public sealed class AttendanceAlreadyConfirmedException : Exception;

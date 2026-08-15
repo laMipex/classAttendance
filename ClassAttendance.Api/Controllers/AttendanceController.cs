@@ -35,6 +35,16 @@ public sealed class AttendanceController(IAttendanceService attendanceService) :
         }
     }
 
+    [HttpGet("sessions/{id:int}/me")]
+    public async Task<ActionResult> GetMyCheckIn(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var result = await attendanceService.GetCheckIn(
+            GetUserId(), id, cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     private int GetUserId() =>
         int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
             ? userId

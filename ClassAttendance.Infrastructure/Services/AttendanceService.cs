@@ -54,6 +54,22 @@ public sealed class AttendanceService(
             attendance.Status);
     }
 
+    public async Task<CheckInResult?> GetCheckIn(
+        int studentId,
+        int attendanceSessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var attendance = await attendanceRepository.GetCheckIn(
+            attendanceSessionId, studentId, cancellationToken);
+        return attendance is null
+            ? null
+            : new CheckInResult(
+                attendance.Id,
+                attendance.AttendanceSessionId,
+                attendance.CheckInAt,
+                attendance.Status);
+    }
+
     public async Task<IReadOnlyList<SubjectAttendanceDto>> GetForProfessorSubject(
         int professorId,
         int subjectId,

@@ -32,6 +32,19 @@ public sealed class AttendanceRepository(DataContext dbContext) : IAttendanceRep
             cancellationToken);
     }
 
+    public Task<Attendance?> GetCheckIn(
+        int attendanceSessionId,
+        int studentId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.Attendances
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                attendance => attendance.AttendanceSessionId == attendanceSessionId
+                    && attendance.StudentId == studentId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(Attendance attendance, CancellationToken cancellationToken = default)
     {
         await dbContext.Attendances.AddAsync(attendance, cancellationToken);

@@ -12,4 +12,18 @@ public interface IScheduleService
         DateTime from,
         DateTime until,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ScheduleLectureDto>> GetProfessorSchedule(
+        int professorId,
+        DateTime from,
+        DateTime until,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateLecture(
+        int professorId,
+        int lectureId,
+        DateTime startsAt,
+        DateTime endsAt,
+        string? rooms,
+        CancellationToken cancellationToken = default);
 }
