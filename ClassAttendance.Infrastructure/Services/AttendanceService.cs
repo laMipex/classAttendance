@@ -25,15 +25,17 @@ public sealed class AttendanceService(
             throw new InvalidOperationException("Student is not enrolled in the subject.");
         }
 
+        var existingAttendance = await attendanceRepository.GetCheckIn(
+            attendanceSessionId, studentId, cancellationToken);
+        if (existingAttendance is not null)
+        {
+            return ToCheckInResult(existingAttendance);
+        }
+
         var now = DateTime.UtcNow;
         if (now < session.OpenFrom || now > session.OpenUntil)
         {
             throw new InvalidOperationException("Attendance session is not currently open.");
-        }
-
-        if (await attendanceRepository.HasCheckIn(attendanceSessionId, studentId, cancellationToken))
-        {
-            throw new InvalidOperationException("Student has already checked in for this session.");
         }
 
         var attendance = new Attendance
@@ -47,11 +49,7 @@ public sealed class AttendanceService(
 
         await attendanceRepository.AddAsync(attendance, cancellationToken);
 
-        return new CheckInResult(
-            attendance.Id,
-            attendance.AttendanceSessionId,
-            attendance.CheckInAt,
-            attendance.Status);
+        return ToCheckInResult(attendance);
     }
 
     public async Task<CheckInResult?> GetCheckIn(
@@ -63,11 +61,7 @@ public sealed class AttendanceService(
             attendanceSessionId, studentId, cancellationToken);
         return attendance is null
             ? null
-            : new CheckInResult(
-                attendance.Id,
-                attendance.AttendanceSessionId,
-                attendance.CheckInAt,
-                attendance.Status);
+            : ToCheckInResult(attendance);
     }
 
     public async Task<IReadOnlyList<SubjectAttendanceDto>> GetForProfessorSubject(
@@ -92,4 +86,11 @@ public sealed class AttendanceService(
             attendance.Status,
             attendance.Method)).ToList();
     }
+
+    private static CheckInResult ToCheckInResult(Attendance attendance) =>
+        new(
+            attendance.Id,
+            attendance.AttendanceSessionId,
+            attendance.CheckInAt,
+            attendance.Status);
 }

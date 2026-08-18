@@ -1,7 +1,7 @@
-﻿using System.Collections.ObjectModel;
+﻿using ClassAttendance.Mobile.Services;
+using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using ClassAttendance.Mobile.Services;
 
 namespace ClassAttendance.Mobile;
 
@@ -30,6 +30,7 @@ public partial class MainPage : ContentPage
 
     public ObservableCollection<ScheduleItem> ScheduleItems { get; } = [];
     public ObservableCollection<ScheduleLectureResponse> EditableLectures { get; } = [];
+    public ObservableCollection<SubjectAttendanceResponse> ProfessorAttendances { get; } = [];
 
     public bool IsLoginVisible => !IsAppVisible;
     public bool IsAppVisible { get; private set; }
@@ -70,7 +71,7 @@ public partial class MainPage : ContentPage
             ? "Attendance is open for this class."
             : "Attendance can be confirmed only while the class attendance session is open.";
     public string ScheduleDescription => IsStudent ? "All classes for your programme." : "Your teaching schedule.";
-    public string ProfileSummary => IsStudent ? "Student account · Class attendance enabled" : "Professor account · Quiz publishing enabled";
+    public string ProfileSummary => IsStudent ? "Student account · Class attendance enabled" : "Professor account · Attendance and quiz management enabled";
     public QuizQuestionResponse? ActiveQuestion { get; private set; }
     private int _activeQuizId;
     public ObservableCollection<QuizOptionResponse> ActiveOptions { get; } = [];
@@ -136,6 +137,10 @@ public partial class MainPage : ContentPage
             if (_isStudent)
             {
                 await LoadAttendanceSessionAsync();
+            }
+            else
+            {
+                await LoadProfessorAttendancesAsync();
             }
             await LoadQuizzesAsync();
             NotifyAppStateChanged();
@@ -395,9 +400,13 @@ public partial class MainPage : ContentPage
     private void OnLogoutClicked(object? sender, EventArgs e)
     {
         IsAppVisible = false;
+        _apiClient.ClearAuthorization();
+        _isStudent = false;
+        _isAttendanceConfirmed = false;
         _activeAttendanceSessionId = null;
         _editingLectureId = null;
         IsAttendanceCheckInOpen = false;
+        ProfessorAttendances.Clear();
         IndexEntry.Text = string.Empty;
         EmailEntry.Text = string.Empty;
         PasswordEntry.Text = string.Empty;
@@ -429,6 +438,8 @@ public partial class MainPage : ContentPage
 
     private async Task LoadAttendanceSessionAsync()
     {
+        _isAttendanceConfirmed = false;
+        _activeAttendanceSessionId = null;
         var now = DateTime.UtcNow;
         var lectures = await _apiClient.GetStudentScheduleAsync(
             now.Date,
@@ -450,6 +461,27 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(AttendanceButtonText));
         OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
         OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
+    }
+
+    private async Task LoadProfessorAttendancesAsync()
+    {
+        ProfessorAttendances.Clear();
+        var now = DateTime.UtcNow;
+        var activeSession = _nextLecture?.AttendanceSessions
+            .FirstOrDefault(session => now >= session.OpenFrom && now <= session.OpenUntil);
+        if (activeSession is null || _nextLecture is null)
+        {
+            return;
+        }
+
+        var attendances = await _apiClient.GetProfessorSubjectAttendancesAsync(
+            _nextLecture.SubjectId, CancellationToken.None);
+        foreach (var attendance in attendances
+            .Where(attendance => attendance.AttendanceSessionId == activeSession.Id)
+            .OrderBy(attendance => attendance.StudentName))
+        {
+            ProfessorAttendances.Add(attendance);
+        }
     }
 
     private async Task LoadScheduleAsync()

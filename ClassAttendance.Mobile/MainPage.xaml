@@ -102,6 +102,33 @@
                         </VerticalStackLayout>
 
                         <VerticalStackLayout IsVisible="{Binding IsProfessor}" Spacing="10">
+                            <Label Text="Students present" Style="{StaticResource SectionTitle}" />
+                            <Label Text="Students who confirmed attendance for the active class."
+                                   Style="{StaticResource CardBody}" />
+                            <CollectionView ItemsSource="{Binding ProfessorAttendances}" SelectionMode="None">
+                                <CollectionView.EmptyView>
+                                    <Label Text="No students have confirmed attendance yet."
+                                           Style="{StaticResource CardBody}" />
+                                </CollectionView.EmptyView>
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource ListCard}">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <VerticalStackLayout Spacing="3">
+                                                    <Label Text="{Binding StudentName}" Style="{StaticResource CardTitle}" />
+                                                    <Label Text="{Binding StudentIndex}" Style="{StaticResource CardBody}" />
+                                                </VerticalStackLayout>
+                                                <Label Grid.Column="1"
+                                                       Text="{Binding CheckInAt, StringFormat='{0:HH:mm}'}"
+                                                       TextColor="#0798DE"
+                                                       FontFamily="RobotoBold"
+                                                       VerticalOptions="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+
                             <Label Text="Quizzes" Style="{StaticResource SectionTitle}" />
                             <Button Text="+ Create a quiz"
                                     Clicked="OnCreateQuizClicked"

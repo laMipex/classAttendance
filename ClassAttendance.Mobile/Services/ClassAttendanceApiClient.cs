@@ -63,6 +63,15 @@ public sealed class ClassAttendanceApiClient
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<IReadOnlyList<SubjectAttendanceResponse>> GetProfessorSubjectAttendancesAsync(
+        int subjectId,
+        CancellationToken cancellationToken) =>
+        await GetAsync<List<SubjectAttendanceResponse>>(
+            $"professor/subjects/{subjectId}/attendances", cancellationToken);
+
+    public void ClearAuthorization() =>
+        _httpClient.DefaultRequestHeaders.Authorization = null;
+
     public async Task<IReadOnlyList<ScheduleLectureResponse>> GetStudentScheduleAsync(
         DateTime from,
         DateTime until,
@@ -175,6 +184,19 @@ public sealed record QuizAnswerRequest(int QuestionId, string? AnswerText, int? 
 public sealed record SetQuizVisibilityRequest(bool IsVisible);
 public sealed record CheckInRequest(int AttendanceSessionId);
 public sealed record CheckInResponse(int AttendanceId, int AttendanceSessionId, DateTime CheckInAt, string Status);
+public sealed record SubjectAttendanceResponse(
+    int AttendanceId,
+    int AttendanceSessionId,
+    int LectureId,
+    int StudentId,
+    string StudentIndex,
+    string StudentName,
+    DateTime CheckInAt,
+    string Status,
+    string Method)
+{
+    public string DisplayText => $"{StudentName} · {StudentIndex}";
+}
 public sealed record ScheduleLectureResponse(
     int Id,
     int SubjectId,
