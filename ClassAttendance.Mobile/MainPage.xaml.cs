@@ -29,6 +29,7 @@ public partial class MainPage : ContentPage
     public ObservableCollection<LectureResponse> ProfessorLectures { get; } = [];
 
     public ObservableCollection<ScheduleItem> ScheduleItems { get; } = [];
+    public ObservableCollection<AttendanceItem> AttendanceItems { get; } = [];
     public ObservableCollection<ScheduleLectureResponse> EditableLectures { get; } = [];
     public ObservableCollection<SubjectAttendanceResponse> ProfessorAttendances { get; } = [];
 
@@ -157,27 +158,20 @@ public partial class MainPage : ContentPage
 
     private async void OnAttendanceClicked(object? sender, EventArgs e)
     {
-        if (!IsAttendanceCheckInOpen || _activeAttendanceSessionId is not int attendanceSessionId)
+        if (sender is not Button { BindingContext: AttendanceItem item }
+            || !item.IsOpen)
         {
             return;
         }
 
         try
         {
-            await _apiClient.CheckInAsync(attendanceSessionId, CancellationToken.None);
-            _isAttendanceConfirmed = true;
-            IsAttendanceCheckInOpen = false;
-            OnPropertyChanged(nameof(AttendanceButtonText));
-            OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
-            OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
+            await _apiClient.CheckInAsync(item.Id, CancellationToken.None);
+            await LoadAttendanceSessionAsync();
         }
         catch (AttendanceAlreadyConfirmedException)
         {
-            _isAttendanceConfirmed = true;
-            IsAttendanceCheckInOpen = false;
-            OnPropertyChanged(nameof(AttendanceButtonText));
-            OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
-            OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
+            await LoadAttendanceSessionAsync();
         }
         catch (HttpRequestException exception)
         {
@@ -276,6 +270,11 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (quiz.IsSubmitted)
+        {
+            return;
+        }
+
         var details = await _apiClient.GetQuizDetailsAsync(quiz.Id, CancellationToken.None);
         _activeQuizId = quiz.Id;
         ActiveQuestion = details.Questions.SingleOrDefault();
@@ -364,17 +363,27 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        await _apiClient.SubmitQuizAsync(
-            _activeQuizId,
-            new SubmitQuizRequest(
-            [
-                new QuizAnswerRequest(
-                    ActiveQuestion.Id,
-                    IsTextAnswerVisible ? AnswerText : null,
-                    IsChoiceAnswerVisible ? SelectedOption?.Id : null)
-            ]),
-            CancellationToken.None);
+        try
+        {
+            await _apiClient.SubmitQuizAsync(
+                _activeQuizId,
+                new SubmitQuizRequest(
+                [
+                    new QuizAnswerRequest(
+                        ActiveQuestion.Id,
+                        IsTextAnswerVisible ? AnswerText : null,
+                        IsChoiceAnswerVisible ? SelectedOption?.Id : null)
+                ]),
+                CancellationToken.None);
+        }
+        catch (HttpRequestException exception)
+        {
+            await DisplayAlertAsync("Quiz could not be submitted", exception.Message, "OK");
+            return;
+        }
+
         await DisplayAlertAsync("Quiz submitted", "Your answer was sent.", "OK");
+        await LoadQuizzesAsync();
         ShowSection(AppSection.Dashboard);
     }
 
@@ -432,12 +441,13 @@ public partial class MainPage : ContentPage
         foreach (var quiz in quizzes)
         {
             var detail = $"{quiz.SubjectName} · {quiz.QuestionCount} question(s)";
-            target.Add(new QuizItem(quiz.Id, quiz.Title, detail, quiz.IsVisible));
+            target.Add(new QuizItem(quiz.Id, quiz.Title, detail, quiz.IsVisible, quiz.IsSubmitted));
         }
     }
 
     private async Task LoadAttendanceSessionAsync()
     {
+        AttendanceItems.Clear();
         _isAttendanceConfirmed = false;
         _activeAttendanceSessionId = null;
         var now = DateTime.UtcNow;
@@ -445,19 +455,27 @@ public partial class MainPage : ContentPage
             now.Date,
             now.Date.AddDays(1),
             CancellationToken.None);
-        var activeSession = lectures
-            .SelectMany(lecture => lecture.AttendanceSessions)
-            .FirstOrDefault(session => now >= session.OpenFrom && now <= session.OpenUntil);
-
-        _activeAttendanceSessionId = activeSession?.Id;
-        IsAttendanceCheckInOpen = activeSession is not null;
-        _isAttendanceConfirmed = activeSession is not null
-            && await _apiClient.GetMyCheckIn(activeSession.Id, CancellationToken.None) is not null;
-        if (_isAttendanceConfirmed)
+        foreach (var lecture in lectures.OrderBy(lecture => lecture.StartsAt))
         {
-            IsAttendanceCheckInOpen = false;
+            foreach (var session in lecture.AttendanceSessions.OrderBy(session => session.OpenFrom))
+            {
+                var confirmed = await _apiClient.GetMyCheckIn(session.Id, CancellationToken.None) is not null;
+                var isOpen = now >= session.OpenFrom && now <= session.OpenUntil && !confirmed;
+                AttendanceItems.Add(new AttendanceItem(
+                    session.Id,
+                    lecture.SubjectName,
+                    lecture.Room,
+                    lecture.StartsAt,
+                    lecture.EndsAt,
+                    confirmed,
+                    isOpen));
+            }
         }
 
+        var activeSession = AttendanceItems.FirstOrDefault(item => item.IsOpen);
+        _activeAttendanceSessionId = activeSession?.Id;
+        _isAttendanceConfirmed = activeSession?.IsConfirmed == true;
+        IsAttendanceCheckInOpen = activeSession is not null;
         OnPropertyChanged(nameof(AttendanceButtonText));
         OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
         OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
@@ -568,10 +586,29 @@ public partial class MainPage : ContentPage
         QuizResponses
     }
 
-    public sealed record QuizItem(int Id, string Title, string Detail, bool IsVisible)
+    public sealed record QuizItem(int Id, string Title, string Detail, bool IsVisible, bool IsSubmitted)
     {
+        public bool CanOpen => !IsSubmitted;
         public string VisibilityText => IsVisible ? "Visible to students" : "Hidden from students";
         public string VisibilityColor => IsVisible ? "#16803C" : "#B54708";
+    }
+    public sealed record AttendanceItem(
+        int Id,
+        string SubjectName,
+        string? Room,
+        DateTime StartsAt,
+        DateTime EndsAt,
+        bool IsConfirmed,
+        bool IsOpen)
+    {
+        public string DisplayTime =>
+            $"{StartsAt.ToLocalTime():dd-MM-yyyy HH:mm} - {EndsAt.ToLocalTime():HH:mm}";
+        public string ButtonText => IsConfirmed ? "Attendance confirmed" : "Confirm attendance";
+        public string StatusText => IsConfirmed
+            ? "Your attendance has been recorded."
+            : IsOpen
+                ? "Attendance is open for this class."
+                : "Attendance is not currently open.";
     }
     public sealed record ScheduleItem(string Time, string Day, string Subject, string Detail);
 }

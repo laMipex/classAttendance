@@ -163,7 +163,7 @@ public sealed class ClassAttendanceApiClient
 
 public sealed record LoginRequest(string? Index, string? Email, string Password);
 public sealed record LoginResponse(string Token, DateTime Expiration, int UserId, string FirstName, string Email, string Role);
-public sealed record QuizResponse(int Id, int LectureId, string Title, string SubjectName, DateTime StartsAt, DateTime EndsAt, int QuestionCount, bool IsVisible);
+public sealed record QuizResponse(int Id, int LectureId, string Title, string SubjectName, DateTime StartsAt, DateTime EndsAt, int QuestionCount, bool IsVisible, bool IsSubmitted);
 public sealed record LectureResponse(int Id, string SubjectName, DateTime StartsAt, DateTime EndsAt, string? Room)
 {
     public string DisplayName => $"{SubjectName} · {StartsAt:ddd, dd MMM HH:mm}";

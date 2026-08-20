@@ -15,7 +15,7 @@ namespace ClassAttendance.Infrastructure.Data
             var alreadySeeded = await db.Users.AnyAsync(u => u.Email == "ivan.ivanovic@classattendance.com", ct);
             if (alreadySeeded)
             {
-                await RefreshDemoAttendanceSessionAsync(db, ct);
+                await EnsureAdditionalDemoDataAsync(db, ct);
                 return;
             }
             var now = DateTime.UtcNow;
@@ -31,6 +31,15 @@ namespace ClassAttendance.Infrastructure.Data
                 FirstName = "Ivan",
                 LastName = "Ivanović",
                 Email = "ivan.ivanovic@classattendance.com",
+                Password = PasswordHasher.HashPassword("Prof123!"),
+                Role = "Professor",
+                IsActive = true
+            };
+            var professor2User = new User
+            {
+                FirstName = "Milica",
+                LastName = "Jovanović",
+                Email = "milica.jovanovic@classattendance.com",
                 Password = PasswordHasher.HashPassword("Prof123!"),
                 Role = "Professor",
                 IsActive = true
@@ -53,12 +62,17 @@ namespace ClassAttendance.Infrastructure.Data
                 Role = "Student",
                 IsActive = true
             };
-            db.Users.AddRange(professorUser, student1User, student2User);
+            db.Users.AddRange(professorUser, professor2User, student1User, student2User);
             await db.SaveChangesAsync(ct);
             var professor = new Professor
             {
                 UserId = professorUser.Id,
                 EmployeeCode = "EMP-0001"
+            };
+            var professor2 = new Professor
+            {
+                UserId = professor2User.Id,
+                EmployeeCode = "EMP-0002"
             };
             var student1 = new Student
             {
@@ -72,7 +86,7 @@ namespace ClassAttendance.Infrastructure.Data
                 Index = "26122035",
                 StudyProgramId = studyProgram.Id
             };
-            db.Professors.Add(professor);
+            db.Professors.AddRange(professor, professor2);
             db.Students.AddRange(student1, student2);
             await db.SaveChangesAsync(ct);
             var subject1 = new Subject
@@ -89,17 +103,27 @@ namespace ClassAttendance.Infrastructure.Data
                 ETCS = 6,
                 Semester = 2
             };
-            db.Subjects.AddRange(subject1, subject2);
+            var subject3 = new Subject
+            {
+                Code = "WEB1",
+                Name = "Web programiranje",
+                ETCS = 6,
+                Semester = 2
+            };
+            db.Subjects.AddRange(subject1, subject2, subject3);
             await db.SaveChangesAsync(ct);
             db.SubjectProfessors.AddRange(
                 new SubjectProfessor { SubjectId = subject1.Id, ProfessorId = professor.UserId },
-                new SubjectProfessor { SubjectId = subject2.Id, ProfessorId = professor.UserId }
+                new SubjectProfessor { SubjectId = subject2.Id, ProfessorId = professor.UserId },
+                new SubjectProfessor { SubjectId = subject3.Id, ProfessorId = professor2.UserId }
             );
             db.Enrollments.AddRange(
                 new Enrollment { StudentId = student1.UserId, SubjectId = subject1.Id, AcademicYear = "2026/2027", Status = "Active" },
                 new Enrollment { StudentId = student1.UserId, SubjectId = subject2.Id, AcademicYear = "2026/2027", Status = "Active" },
                 new Enrollment { StudentId = student2.UserId, SubjectId = subject1.Id, AcademicYear = "2026/2027", Status = "Active" },
-                new Enrollment { StudentId = student2.UserId, SubjectId = subject2.Id, AcademicYear = "2026/2027", Status = "Active" }
+                new Enrollment { StudentId = student2.UserId, SubjectId = subject2.Id, AcademicYear = "2026/2027", Status = "Active" },
+                new Enrollment { StudentId = student1.UserId, SubjectId = subject3.Id, AcademicYear = "2026/2027", Status = "Active" },
+                new Enrollment { StudentId = student2.UserId, SubjectId = subject3.Id, AcademicYear = "2026/2027", Status = "Active" }
             );
             var lecture1 = new Lecture
             {
@@ -125,7 +149,15 @@ namespace ClassAttendance.Infrastructure.Data
                 EndsAt = now.AddDays(2).Date.AddHours(10),
                 Rooms = "A1"
             };
-            db.Lectures.AddRange(lecture1, lecture2, lecture3);
+            var lecture4 = new Lecture
+            {
+                SubjectId = subject3.Id,
+                ProfessorId = professor2.UserId,
+                StartsAt = now.AddDays(3).Date.AddHours(14),
+                EndsAt = now.AddDays(3).Date.AddHours(16),
+                Rooms = "B2"
+            };
+            db.Lectures.AddRange(lecture1, lecture2, lecture3, lecture4);
             await db.SaveChangesAsync(ct);
             var attendanceSession = new AttendanceSession
             {
@@ -148,10 +180,18 @@ namespace ClassAttendance.Infrastructure.Data
                 OpenUntil = lecture3.StartsAt.AddMinutes(15),
                 WifiRequired = false
             };
+            var fourthAttendanceSession = new AttendanceSession
+            {
+                LectureId = lecture4.Id,
+                OpenFrom = lecture4.StartsAt.AddMinutes(-15),
+                OpenUntil = lecture4.StartsAt.AddMinutes(15),
+                WifiRequired = false
+            };
             db.AttendanceSessions.AddRange(
                 attendanceSession,
                 futureAttendanceSession,
-                laterAttendanceSession);
+                laterAttendanceSession,
+                fourthAttendanceSession);
             await db.SaveChangesAsync(ct);
             db.Attendances.Add(new Attendance
             {
@@ -164,29 +204,73 @@ namespace ClassAttendance.Infrastructure.Data
             await db.SaveChangesAsync(ct);
         }
 
-        private static async Task RefreshDemoAttendanceSessionAsync(
-            DataContext db,
-            CancellationToken ct)
+        private static async Task EnsureAdditionalDemoDataAsync(DataContext db, CancellationToken ct)
         {
-            var attendanceSession = await db.AttendanceSessions
-                .Include(session => session.Lecture)
-                    .ThenInclude(lecture => lecture.Subject)
-                .SingleOrDefaultAsync(
-                    session => session.Lecture.Subject.Code == "OOP1"
-                        && session.Lecture.Rooms == "A1",
-                    ct);
-
-            if (attendanceSession is null)
+            if (await db.Subjects.AnyAsync(subject => subject.Code == "WEB1", ct))
             {
                 return;
             }
 
+            var studyProgram = await db.StudyPrograms.FirstAsync(ct);
+            var professorUser = new User
+            {
+                FirstName = "Milica",
+                LastName = "Jovanović",
+                Email = "milica.jovanovic@classattendance.com",
+                Password = PasswordHasher.HashPassword("Prof123!"),
+                Role = "Professor",
+                IsActive = true
+            };
+            db.Users.Add(professorUser);
+            await db.SaveChangesAsync(ct);
+
+            db.Professors.Add(new Professor { UserId = professorUser.Id, EmployeeCode = "EMP-0002" });
+            var subject = new Subject
+            {
+                Code = "WEB1",
+                Name = "Web programiranje",
+                ETCS = 6,
+                Semester = 2
+            };
+            db.Subjects.Add(subject);
+            await db.SaveChangesAsync(ct);
+
+            db.SubjectProfessors.Add(new SubjectProfessor
+            {
+                SubjectId = subject.Id,
+                ProfessorId = professorUser.Id
+            });
+            foreach (var student in await db.Students.ToListAsync(ct))
+            {
+                db.Enrollments.Add(new Enrollment
+                {
+                    StudentId = student.UserId,
+                    SubjectId = subject.Id,
+                    AcademicYear = "2026/2027",
+                    Status = "Active"
+                });
+            }
+
             var now = DateTime.UtcNow;
-            attendanceSession.Lecture.StartsAt = now.AddHours(-1);
-            attendanceSession.Lecture.EndsAt = now.AddHours(1);
-            attendanceSession.OpenFrom = now.AddMinutes(-15);
-            attendanceSession.OpenUntil = now.AddMinutes(15);
+            var lecture = new Lecture
+            {
+                SubjectId = subject.Id,
+                ProfessorId = professorUser.Id,
+                StartsAt = now.AddDays(3).Date.AddHours(14),
+                EndsAt = now.AddDays(3).Date.AddHours(16),
+                Rooms = "B2"
+            };
+            db.Lectures.Add(lecture);
+            await db.SaveChangesAsync(ct);
+            db.AttendanceSessions.Add(new AttendanceSession
+            {
+                LectureId = lecture.Id,
+                OpenFrom = lecture.StartsAt.AddMinutes(-15),
+                OpenUntil = lecture.StartsAt.AddMinutes(15),
+                WifiRequired = false
+            });
             await db.SaveChangesAsync(ct);
         }
+
     }
 }

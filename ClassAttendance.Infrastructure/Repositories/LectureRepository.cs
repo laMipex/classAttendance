@@ -80,6 +80,11 @@ public sealed class LectureRepository(DataContext dbContext) : ILectureRepositor
             return false;
         }
 
+        var attendance = await dbContext.Attendances
+            .Where(item => item.AttendanceSession.LectureId == lectureId)
+            .ToListAsync(cancellationToken);
+        dbContext.Attendances.RemoveRange(attendance);
+
         lecture.StartsAt = startsAt;
         lecture.EndsAt = endsAt;
         lecture.Rooms = rooms;

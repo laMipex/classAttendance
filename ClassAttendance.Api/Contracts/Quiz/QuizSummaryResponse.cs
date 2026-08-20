@@ -8,5 +8,6 @@ public sealed record QuizSummaryResponse(
     DateTime StartsAt,
     DateTime EndsAt,
     int QuestionCount,
-    bool IsVisible
+    bool IsVisible,
+    bool IsSubmitted
 );

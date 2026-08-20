@@ -33,7 +33,9 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
                 quiz.StartsAt,
                 quiz.EndsAt,
                 dbContext.QuizQuestions.Count(question => question.QuizSessionId == quiz.Id),
-                quiz.isActive))
+                quiz.isActive,
+                dbContext.QuizResponses.Any(response =>
+                    response.QuizSessionId == quiz.Id && response.StudentId == studentId)))
             .ToListAsync(cancellationToken);
 
         return Ok(quizzes);
@@ -55,7 +57,8 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
                 quiz.StartsAt,
                 quiz.EndsAt,
                 dbContext.QuizQuestions.Count(question => question.QuizSessionId == quiz.Id),
-                quiz.isActive))
+                quiz.isActive,
+                false))
             .ToListAsync(cancellationToken);
 
         return Ok(quizzes);
@@ -141,7 +144,8 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
             quiz.StartsAt,
             quiz.EndsAt,
             1,
-            quiz.isActive));
+            quiz.isActive,
+            false));
     }
 
     [HttpGet("{id:int}")]
@@ -165,6 +169,13 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
         if (quiz is null)
         {
             return NotFound();
+        }
+
+        if (await dbContext.QuizResponses.AnyAsync(
+                response => response.QuizSessionId == id && response.StudentId == studentId,
+                cancellationToken))
+        {
+            return Conflict(new { error = "This quiz has already been submitted." });
         }
 
         var questions = await dbContext.QuizQuestions
@@ -247,6 +258,13 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
         if (quiz is null)
         {
             return NotFound();
+        }
+
+        if (await dbContext.QuizResponses.AnyAsync(
+                response => response.QuizSessionId == id && response.StudentId == studentId,
+                cancellationToken))
+        {
+            return Conflict(new { error = "This quiz has already been submitted." });
         }
 
         var questions = await dbContext.QuizQuestions

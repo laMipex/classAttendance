@@ -8,7 +8,6 @@
         <Image Source="login_background.svg"
                IsVisible="{Binding IsLoginVisible}"
                Aspect="AspectFill" />
-
         <ScrollView IsVisible="{Binding IsLoginVisible}">
             <VerticalStackLayout WidthRequest="360"
                                  HorizontalOptions="Center"
@@ -51,7 +50,6 @@
                         Margin="0,26,0,0" />
             </VerticalStackLayout>
         </ScrollView>
-
         <Grid IsVisible="{Binding IsAppVisible}"
               RowDefinitions="*,72"
               BackgroundColor="#F7FAFC">
@@ -60,37 +58,54 @@
                     <VerticalStackLayout Padding="24,40,24,24" Spacing="18">
                         <Label Text="{Binding WelcomeText}" Style="{StaticResource ScreenTitle}" />
                         <Label Text="{Binding RoleDescription}" Style="{StaticResource Subtitle}" />
-
                         <Border Style="{StaticResource StatusCard}">
                             <VerticalStackLayout Spacing="8">
                                 <Label Text="{Binding LessonStatusTitle}" Style="{StaticResource CardTitle}" />
                                 <Label Text="{Binding LessonStatusDetail}" Style="{StaticResource CardBody}" />
                                 <Label Text="{Binding LessonTime}" TextColor="#0798DE" FontFamily="RobotoBold" FontSize="16" />
-                                <Label Text="{Binding AttendanceAvailabilityMessage}"
-                                       IsVisible="{Binding IsStudent}"
-                                       Style="{StaticResource CardBody}" />
-                                <Button Text="{Binding AttendanceButtonText}"
-                                        Clicked="OnAttendanceClicked"
-                                        IsVisible="{Binding IsStudent}"
-                                        IsEnabled="{Binding IsAttendanceCheckInOpen}"
-                                        Style="{StaticResource PrimaryActionButton}"
-                                        HorizontalOptions="Start"
-                                        Margin="0,8,0,0" />
+                                <CollectionView ItemsSource="{Binding AttendanceItems}"
+                                                IsVisible="{Binding IsStudent}"
+                                                SelectionMode="None">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource ListCard}">
+                                                <VerticalStackLayout Spacing="5">
+                                                    <Label Text="{Binding SubjectName}" Style="{StaticResource CardTitle}" />
+                                                    <Label Text="{Binding Room, StringFormat='Room: {0}'}" Style="{StaticResource CardBody}" />
+                                                    <Label Text="{Binding DisplayTime}" TextColor="#0798DE" FontFamily="RobotoBold" />
+                                                    <Label Text="{Binding StatusText}" Style="{StaticResource CardBody}" />
+                                                    <Button Text="{Binding ButtonText}"
+                                                            Clicked="OnAttendanceClicked"
+                                                            IsEnabled="{Binding IsOpen}"
+                                                            Style="{StaticResource PrimaryActionButton}"
+                                                            HorizontalOptions="Start" />
+                                                </VerticalStackLayout>
+                                            </Border>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
                             </VerticalStackLayout>
                         </Border>
-
                         <VerticalStackLayout IsVisible="{Binding IsStudent}" Spacing="10">
                             <Label Text="Active quizzes" Style="{StaticResource SectionTitle}" />
                             <CollectionView ItemsSource="{Binding StudentQuizzes}" SelectionMode="None">
                                 <CollectionView.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Style="{StaticResource ListCard}">
+                                        <Border Style="{StaticResource ListCard}"
+                                                IsEnabled="{Binding CanOpen}">
                                             <Border.GestureRecognizers>
                                                 <TapGestureRecognizer Tapped="OnStudentQuizTapped" />
                                             </Border.GestureRecognizers>
                                             <Grid ColumnDefinitions="*,Auto">
                                                 <VerticalStackLayout Spacing="3">
-                                                    <Label Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                                    <HorizontalStackLayout Spacing="8">
+                                                        <Label Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                                        <Label Text="Submitted"
+                                                               IsVisible="{Binding IsSubmitted}"
+                                                               TextColor="#16803C"
+                                                               FontFamily="RobotoBold"
+                                                               FontSize="13" />
+                                                    </HorizontalStackLayout>
                                                     <Label Text="{Binding Detail}" Style="{StaticResource CardBody}" />
                                                 </VerticalStackLayout>
                                                 <Label Grid.Column="1" Text="›" FontSize="30" TextColor="#0798DE" VerticalOptions="Center" />
@@ -100,7 +115,6 @@
                                 </CollectionView.ItemTemplate>
                             </CollectionView>
                         </VerticalStackLayout>
-
                         <VerticalStackLayout IsVisible="{Binding IsProfessor}" Spacing="10">
                             <Label Text="Students present" Style="{StaticResource SectionTitle}" />
                             <Label Text="Students who confirmed attendance for the active class."
@@ -128,7 +142,6 @@
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
                             </CollectionView>
-
                             <Label Text="Quizzes" Style="{StaticResource SectionTitle}" />
                             <Button Text="+ Create a quiz"
                                     Clicked="OnCreateQuizClicked"
@@ -157,7 +170,6 @@
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </ScrollView>
-
                 <ScrollView IsVisible="{Binding IsScheduleVisible}">
                     <VerticalStackLayout Padding="24,40,24,24" Spacing="14">
                         <Label Text="Schedule" Style="{StaticResource ScreenTitle}" />
@@ -228,7 +240,6 @@
                         </VerticalStackLayout>
                     </VerticalStackLayout>
                 </ScrollView>
-
                 <ScrollView IsVisible="{Binding IsProfileVisible}">
                     <VerticalStackLayout Padding="24,40,24,24" Spacing="18">
                         <Label Text="Profile" Style="{StaticResource ScreenTitle}" />
@@ -250,7 +261,6 @@
                                 Style="{StaticResource OutlineActionButton}" />
                     </VerticalStackLayout>
                 </ScrollView>
-
                 <ScrollView IsVisible="{Binding IsQuizEditorVisible}">
                     <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
                         <Button Text="‹ Back to dashboard"
@@ -282,7 +292,6 @@
                                 Style="{StaticResource PrimaryActionButton}" />
                     </VerticalStackLayout>
                 </ScrollView>
-
                 <ScrollView IsVisible="{Binding IsQuizAnswerVisible}">
                     <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
                         <Button Text="‹ Back to dashboard"
@@ -303,7 +312,6 @@
                                 Style="{StaticResource PrimaryActionButton}" />
                     </VerticalStackLayout>
                 </ScrollView>
-
                 <ScrollView IsVisible="{Binding IsQuizResponsesVisible}">
                     <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
                         <Button Text="‹ Back to dashboard"
@@ -335,14 +343,12 @@
                     </VerticalStackLayout>
                 </ScrollView>
             </Grid>
-
             <Grid Grid.Row="1" BackgroundColor="White" ColumnDefinitions="*,*,*" Padding="16,8">
                 <Button Text="Home" Clicked="OnDashboardClicked" Style="{StaticResource NavigationButton}" />
                 <Button Grid.Column="1" Text="Schedule" Clicked="OnScheduleClicked" Style="{StaticResource NavigationButton}" />
                 <Button Grid.Column="2" Text="Profile" Clicked="OnProfileClicked" Style="{StaticResource NavigationButton}" />
             </Grid>
         </Grid>
-
         <Grid IsVisible="{Binding IsLoginSubmitting}" BackgroundColor="#80FFFFFF">
             <ActivityIndicator IsRunning="{Binding IsLoginSubmitting}"
                                Color="#0798DE"
