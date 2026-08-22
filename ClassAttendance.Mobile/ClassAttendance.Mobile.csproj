@@ -48,43 +48,33 @@
     <MauiIcon Include="Resources\AppIcon\appicon.svg" />
 
     <!-- Splash Screen -->
-    <MauiSplashScreen Include="Resources\Splash\splash.svg"
-                      Color="#FFFFFF"
-                      BaseSize="250,250" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#FFFFFF" BaseSize="250,250" />
 
     <!-- Images -->
     <MauiImage Include="Resources\Images\*" />
 
-    <MauiImage Update="Resources\Images\vts_logo.jpg"
-               Resize="True"
-               BaseSize="200,200" />
+    <MauiImage Update="Resources\Images\vts_logo.jpg" Resize="True" BaseSize="200,200" />
 
     <!-- Custom Fonts -->
     <MauiFont Include="Resources\Fonts\*" />
 
     <!-- Raw Assets -->
-    <MauiAsset Include="Resources\Raw\**"
-               LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+    <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 
   </ItemGroup>
 
   <ItemGroup>
 
     <!-- NuGet Packages -->
-    <PackageReference Include="CommunityToolkit.Maui"
-                      Version="15.0.0" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="15.0.0" />
 
-    <PackageReference Include="CommunityToolkit.Mvvm"
-                      Version="8.4.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 
-    <PackageReference Include="Microsoft.Extensions.Http"
-                      Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
 
-    <PackageReference Include="Microsoft.Maui.Controls"
-                      Version="10.0.90" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
 
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug"
-                      Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
 
   </ItemGroup>
 
@@ -93,6 +83,12 @@
     <!-- Application Project -->
     <ProjectReference Include="..\ClassAttendance.Application\ClassAttendance.Application.csproj" />
 
+  </ItemGroup>
+
+  <ItemGroup>
+    <MauiXaml Update="LectureEditPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
   </ItemGroup>
 
 </Project>

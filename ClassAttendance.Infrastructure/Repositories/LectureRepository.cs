@@ -80,20 +80,23 @@ public sealed class LectureRepository(DataContext dbContext) : ILectureRepositor
             return false;
         }
 
-        var attendance = await dbContext.Attendances
-            .Where(item => item.AttendanceSession.LectureId == lectureId)
-            .ToListAsync(cancellationToken);
-        dbContext.Attendances.RemoveRange(attendance);
-
         lecture.StartsAt = startsAt;
         lecture.EndsAt = endsAt;
         lecture.Rooms = rooms;
 
         foreach (var session in lecture.AttendanceSessions)
         {
-            var duration = session.OpenUntil - session.OpenFrom;
             session.OpenFrom = startsAt.AddMinutes(-15);
             session.OpenUntil = startsAt.AddMinutes(15);
+        }
+
+        var quizzes = await dbContext.QuizSessions
+            .Where(quiz => quiz.LectureId == lectureId)
+            .ToListAsync(cancellationToken);
+        foreach (var quiz in quizzes)
+        {
+            quiz.StartsAt = startsAt;
+            quiz.EndsAt = endsAt;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

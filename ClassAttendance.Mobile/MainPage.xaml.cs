@@ -55,8 +55,8 @@ public partial class MainPage : ContentPage
     public string UserName { get; private set; } = string.Empty;
     public string UserIdentifier { get; private set; } = string.Empty;
     public string UserRole => IsStudent ? "Student" : "Professor";
+    public string RoleDescription => UserRole;
     public string WelcomeText => $"Welcome, {UserName}";
-    public string RoleDescription => IsStudent ? "Here is your class overview for today." : "Here is your teaching overview for today.";
     public string LessonStatusTitle => _nextLecture is null ? "No upcoming classes" : "Your next class starts soon";
     public string LessonStatusDetail => _nextLecture is null
         ? "Your schedule is currently empty."
@@ -184,21 +184,18 @@ public partial class MainPage : ContentPage
 
     private void OnDashboardClicked(object? sender, EventArgs e) => ShowSection(AppSection.Dashboard);
     private void OnScheduleClicked(object? sender, EventArgs e) => ShowSection(AppSection.Schedule);
-    private void OnEditLectureClicked(object? sender, EventArgs e)
+    private async void OnEditLectureClicked(object? sender, EventArgs e)
     {
-        if (sender is not Button { BindingContext: ScheduleLectureResponse lecture })
+        if (sender is not Button button
+            || button.CommandParameter is not ScheduleLectureResponse lecture)
         {
             return;
         }
 
-        _editingLectureId = lecture.Id;
-        var startsAt = lecture.StartsAt.ToLocalTime();
-        var endsAt = lecture.EndsAt.ToLocalTime();
-        LectureDatePicker.Date = startsAt.Date;
-        LectureStartTimePicker.Time = startsAt.TimeOfDay;
-        LectureEndTimePicker.Time = endsAt.TimeOfDay;
-        LectureRoomEntry.Text = lecture.Room;
-        OnPropertyChanged(nameof(IsLectureEditorVisible));
+        await Navigation.PushAsync(new LectureEditPage(
+            _apiClient,
+            lecture,
+            LoadScheduleAsync));
     }
 
     private async void OnSaveLectureClicked(object? sender, EventArgs e)
@@ -505,14 +502,16 @@ public partial class MainPage : ContentPage
     private async Task LoadScheduleAsync()
     {
         var now = DateTime.UtcNow;
+        var weekStart = StartOfScheduleWeek(now);
+        var weekEnd = weekStart.AddDays(5);
         var lectures = IsStudent
-            ? await _apiClient.GetStudentScheduleAsync(now.Date, now.Date.AddDays(30), CancellationToken.None)
-            : await _apiClient.GetProfessorScheduleAsync(CancellationToken.None);
+            ? await _apiClient.GetStudentScheduleAsync(weekStart, weekEnd, CancellationToken.None)
+            : await _apiClient.GetProfessorScheduleAsync(weekStart, weekEnd, CancellationToken.None);
 
         ScheduleItems.Clear();
         EditableLectures.Clear();
         _nextLecture = lectures
-            .Where(lecture => lecture.EndsAt >= now)
+            .Where(lecture => lecture.EndsAt.ToUniversalTime() >= now)
             .OrderBy(lecture => lecture.StartsAt)
             .FirstOrDefault();
         foreach (var lecture in lectures)
@@ -531,6 +530,15 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(LessonStatusTitle));
         OnPropertyChanged(nameof(LessonStatusDetail));
         OnPropertyChanged(nameof(LessonTime));
+    }
+
+    private static DateTime StartOfScheduleWeek(DateTime date)
+    {
+        var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
+        var start = date.Date.AddDays(-daysSinceMonday);
+        return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
+            ? start.AddDays(7)
+            : start;
     }
 
     private void ShowValidationMessage(string message)

@@ -16,6 +16,8 @@ namespace ClassAttendance.Infrastructure.Data
             if (alreadySeeded)
             {
                 await EnsureAdditionalDemoDataAsync(db, ct);
+                await EnsureIvanSubjectsAsync(db, ct);
+                await EnsureWeeklyDemoLecturesAsync(db, ct);
                 return;
             }
             var now = DateTime.UtcNow;
@@ -202,6 +204,8 @@ namespace ClassAttendance.Infrastructure.Data
                 Status = "Present"
             });
             await db.SaveChangesAsync(ct);
+            await EnsureIvanSubjectsAsync(db, ct);
+            await EnsureWeeklyDemoLecturesAsync(db, ct);
         }
 
         private static async Task EnsureAdditionalDemoDataAsync(DataContext db, CancellationToken ct)
@@ -270,6 +274,171 @@ namespace ClassAttendance.Infrastructure.Data
                 WifiRequired = false
             });
             await db.SaveChangesAsync(ct);
+        }
+
+        private static async Task EnsureIvanSubjectsAsync(DataContext db, CancellationToken ct)
+        {
+            var professor = await db.Professors
+                .SingleOrDefaultAsync(item => item.UserId == db.Users
+                    .Where(user => user.Email == "ivan.ivanovic@classattendance.com")
+                    .Select(user => user.Id)
+                    .Single(), ct);
+            if (professor is null)
+            {
+                return;
+            }
+
+            var students = await db.Students.Select(student => student.UserId).ToListAsync(ct);
+            var studySubjects = new[]
+            {
+                new { Code = "ALG1", Name = "Algoritmi i strukture podataka" },
+                new { Code = "OS1", Name = "Operativni sistemi" }
+            };
+
+            foreach (var subjectData in studySubjects)
+            {
+                var subject = await db.Subjects
+                    .SingleOrDefaultAsync(item => item.Code == subjectData.Code, ct);
+                if (subject is null)
+                {
+                    subject = new Subject
+                    {
+                        Code = subjectData.Code,
+                        Name = subjectData.Name,
+                        ETCS = 6,
+                        Semester = 2
+                    };
+                    db.Subjects.Add(subject);
+                    await db.SaveChangesAsync(ct);
+                }
+
+                var assignmentExists = await db.SubjectProfessors.AnyAsync(
+                    item => item.SubjectId == subject.Id && item.ProfessorId == professor.UserId, ct);
+                if (!assignmentExists)
+                {
+                    db.SubjectProfessors.Add(new SubjectProfessor
+                    {
+                        SubjectId = subject.Id,
+                        ProfessorId = professor.UserId
+                    });
+                }
+
+                foreach (var studentId in students)
+                {
+                    var enrollmentExists = await db.Enrollments.AnyAsync(
+                        item => item.SubjectId == subject.Id && item.StudentId == studentId, ct);
+                    if (!enrollmentExists)
+                    {
+                        db.Enrollments.Add(new Enrollment
+                        {
+                            StudentId = studentId,
+                            SubjectId = subject.Id,
+                            AcademicYear = "2026/2027",
+                            Status = "Active"
+                        });
+                    }
+                }
+
+                var lectureExists = await db.Lectures.AnyAsync(
+                    item => item.SubjectId == subject.Id && item.ProfessorId == professor.UserId, ct);
+                if (!lectureExists)
+                {
+                    var lecture = new Lecture
+                    {
+                        SubjectId = subject.Id,
+                        ProfessorId = professor.UserId,
+                        StartsAt = DateTime.UtcNow.AddDays(subjectData.Code == "ALG1" ? 4 : 5).Date.AddHours(10),
+                        EndsAt = DateTime.UtcNow.AddDays(subjectData.Code == "ALG1" ? 4 : 5).Date.AddHours(12),
+                        Rooms = subjectData.Code == "ALG1" ? "A3" : "A4"
+                    };
+                    db.Lectures.Add(lecture);
+                    await db.SaveChangesAsync(ct);
+                    db.AttendanceSessions.Add(new AttendanceSession
+                    {
+                        LectureId = lecture.Id,
+                        OpenFrom = lecture.StartsAt.AddMinutes(-15),
+                        OpenUntil = lecture.StartsAt.AddMinutes(15),
+                        WifiRequired = false
+                    });
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+
+        private static async Task EnsureWeeklyDemoLecturesAsync(DataContext db, CancellationToken ct)
+        {
+            var professorIds = await db.Users
+                .Where(user => user.Email == "ivan.ivanovic@classattendance.com"
+                    || user.Email == "milica.jovanovic@classattendance.com")
+                .ToDictionaryAsync(user => user.Email, user => user.Id, ct);
+
+            var subjectIds = await db.Subjects
+                .Where(subject => new[] { "OOP1", "DB1", "WEB1", "ALG1", "OS1" }
+                    .Contains(subject.Code))
+                .ToDictionaryAsync(subject => subject.Code, subject => subject.Id, ct);
+
+            var schedule = new[]
+            {
+                new { Day = 0, Hour = 8, Subject = "OOP1", Professor = "ivan.ivanovic@classattendance.com", Room = "A1" },
+                new { Day = 0, Hour = 10, Subject = "DB1", Professor = "ivan.ivanovic@classattendance.com", Room = "A2" },
+                new { Day = 0, Hour = 12, Subject = "ALG1", Professor = "ivan.ivanovic@classattendance.com", Room = "A3" },
+                new { Day = 1, Hour = 9, Subject = "OS1", Professor = "ivan.ivanovic@classattendance.com", Room = "A4" },
+                new { Day = 1, Hour = 11, Subject = "OOP1", Professor = "ivan.ivanovic@classattendance.com", Room = "A1" },
+                new { Day = 2, Hour = 8, Subject = "DB1", Professor = "ivan.ivanovic@classattendance.com", Room = "A2" },
+                new { Day = 2, Hour = 10, Subject = "ALG1", Professor = "ivan.ivanovic@classattendance.com", Room = "A3" },
+                new { Day = 2, Hour = 13, Subject = "OS1", Professor = "ivan.ivanovic@classattendance.com", Room = "A4" },
+                new { Day = 3, Hour = 9, Subject = "OOP1", Professor = "ivan.ivanovic@classattendance.com", Room = "A1" },
+                new { Day = 3, Hour = 11, Subject = "DB1", Professor = "ivan.ivanovic@classattendance.com", Room = "A2" },
+                new { Day = 4, Hour = 10, Subject = "ALG1", Professor = "ivan.ivanovic@classattendance.com", Room = "A3" },
+                new { Day = 4, Hour = 12, Subject = "WEB1", Professor = "milica.jovanovic@classattendance.com", Room = "B2" }
+            };
+
+            var weekStart = StartOfWeek(DateTime.UtcNow);
+            foreach (var item in schedule)
+            {
+                if (!subjectIds.TryGetValue(item.Subject, out var subjectId)
+                    || !professorIds.TryGetValue(item.Professor, out var professorId))
+                {
+                    continue;
+                }
+
+                var startsAt = weekStart.AddDays(item.Day).AddHours(item.Hour);
+                var lectureExists = await db.Lectures.AnyAsync(
+                    lecture => lecture.SubjectId == subjectId
+                        && lecture.ProfessorId == professorId
+                        && lecture.StartsAt == startsAt, ct);
+                if (lectureExists)
+                {
+                    continue;
+                }
+
+                var lecture = new Lecture
+                {
+                    SubjectId = subjectId,
+                    ProfessorId = professorId,
+                    StartsAt = startsAt,
+                    EndsAt = startsAt.AddHours(2),
+                    Rooms = item.Room
+                };
+                db.Lectures.Add(lecture);
+                await db.SaveChangesAsync(ct);
+                db.AttendanceSessions.Add(new AttendanceSession
+                {
+                    LectureId = lecture.Id,
+                    OpenFrom = startsAt.AddMinutes(-15),
+                    OpenUntil = startsAt.AddMinutes(15),
+                    WifiRequired = false
+                });
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+
+        private static DateTime StartOfWeek(DateTime date)
+        {
+            var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
+            return date.Date.AddDays(-daysSinceMonday);
         }
 
     }

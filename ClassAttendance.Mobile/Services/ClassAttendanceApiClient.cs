@@ -46,8 +46,13 @@ public sealed class ClassAttendanceApiClient
         await GetAsync<List<LectureResponse>>("quiz/lectures", cancellationToken);
 
     public async Task<IReadOnlyList<ScheduleLectureResponse>> GetProfessorScheduleAsync(
-        CancellationToken cancellationToken) =>
-        await GetAsync<List<ScheduleLectureResponse>>("professor/schedule", cancellationToken);
+        DateTime from,
+        DateTime until,
+        CancellationToken cancellationToken)
+    {
+        var path = $"professor/schedule?from={Uri.EscapeDataString(from.ToString("O"))}&until={Uri.EscapeDataString(until.ToString("O"))}";
+        return await GetAsync<List<ScheduleLectureResponse>>(path, cancellationToken);
+    }
 
     public async Task UpdateLectureAsync(
         int lectureId,

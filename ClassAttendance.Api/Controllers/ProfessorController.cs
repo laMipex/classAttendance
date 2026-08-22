@@ -33,11 +33,20 @@ public sealed class ProfessorController(
     }
 
     [HttpGet("schedule")]
-    public async Task<ActionResult> GetSchedule(CancellationToken cancellationToken)
+    public async Task<ActionResult> GetSchedule(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? until,
+        CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var start = from ?? StartOfScheduleWeek(DateTime.UtcNow);
+        var end = until ?? start.AddDays(5);
+        if (end <= start)
+        {
+            return BadRequest(new { error = "The schedule end must be after its start." });
+        }
+
         return Ok(await scheduleService.GetProfessorSchedule(
-            GetUserId(), now.Date, now.Date.AddDays(30), cancellationToken));
+            GetUserId(), start, end, cancellationToken));
     }
 
     [HttpPut("schedule/{id:int}")]
@@ -62,4 +71,13 @@ public sealed class ProfessorController(
         int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
             ? userId
             : throw new InvalidOperationException("Authenticated user identifier is missing.");
+
+    private static DateTime StartOfScheduleWeek(DateTime date)
+    {
+        var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
+        var start = date.Date.AddDays(-daysSinceMonday);
+        return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
+            ? start.AddDays(7)
+            : start;
+    }
 }
