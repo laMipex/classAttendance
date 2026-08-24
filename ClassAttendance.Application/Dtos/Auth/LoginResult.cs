@@ -8,6 +8,7 @@ public sealed record LoginResult(
     string Token,
     DateTime Expiration,
     int UserId,
+    string FirstName,
     string Email,
     string Role
 );

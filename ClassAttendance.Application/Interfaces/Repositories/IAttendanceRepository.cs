@@ -14,6 +14,11 @@ namespace ClassAttendance.Application.Interfaces.Repositories
             int studentId,
             CancellationToken cancellationToken = default);
 
+        Task<Attendance?> GetCheckIn(
+            int attendanceSessionId,
+            int studentId,
+            CancellationToken cancellationToken = default);
+
         Task AddAsync(Attendance attendance, CancellationToken cancellationToken = default);
 
         Task<IReadOnlyList<Attendance>> GetForSubject(int subjectId, CancellationToken cancellationToken = default);

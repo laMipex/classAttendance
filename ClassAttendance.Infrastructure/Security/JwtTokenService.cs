@@ -29,6 +29,7 @@ public sealed class JwtTokenService
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.GivenName, user.FirstName),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role)
@@ -48,6 +49,7 @@ public sealed class JwtTokenService
             new JwtSecurityTokenHandler().WriteToken(token),
             expiresAt,
             user.Id,
+            user.FirstName,
             user.Email,
             user.Role);
     }

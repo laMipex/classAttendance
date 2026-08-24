@@ -7,7 +7,12 @@ namespace ClassAttendance.Application.Interfaces.Services;
 
 public interface IAttendanceService
 {
-    Task<CheckInResult> CheckIn (
+    Task<CheckInResult> CheckIn(
+        int studentId,
+        int attendanceSessionId,
+        CancellationToken cancellationToken = default);
+
+    Task<CheckInResult?> GetCheckIn(
         int studentId,
         int attendanceSessionId,
         CancellationToken cancellationToken = default);
@@ -15,5 +20,5 @@ public interface IAttendanceService
     Task<IReadOnlyList<SubjectAttendanceDto>> GetForProfessorSubject(
         int professorId,
         int subjectId,
-        CancellationToken cancellationToken= default);
+        CancellationToken cancellationToken = default);
 }
