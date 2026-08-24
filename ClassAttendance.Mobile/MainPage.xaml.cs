@@ -182,7 +182,14 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void OnDashboardClicked(object? sender, EventArgs e) => ShowSection(AppSection.Dashboard);
+    private async void OnDashboardClicked(object? sender, EventArgs e)
+    {
+        ShowSection(AppSection.Dashboard);
+        if (IsProfessor)
+        {
+            await LoadProfessorAttendancesAsync();
+        }
+    }
     private void OnScheduleClicked(object? sender, EventArgs e) => ShowSection(AppSection.Schedule);
     private async void OnEditLectureClicked(object? sender, EventArgs e)
     {
@@ -452,21 +459,34 @@ public partial class MainPage : ContentPage
             now.Date,
             now.Date.AddDays(1),
             CancellationToken.None);
-        foreach (var lecture in lectures.OrderBy(lecture => lecture.StartsAt))
+        var sessions = lectures
+            .OrderBy(lecture => lecture.StartsAt)
+            .SelectMany(lecture => lecture.AttendanceSessions
+                .OrderBy(session => session.OpenFrom)
+                .Select(session => (Lecture: lecture, Session: session)))
+            .ToList();
+        var selectedSession = sessions.FirstOrDefault(item =>
+            now >= item.Session.OpenFrom.ToUniversalTime()
+            && now <= item.Session.OpenUntil.ToUniversalTime());
+        if (selectedSession == default)
         {
-            foreach (var session in lecture.AttendanceSessions.OrderBy(session => session.OpenFrom))
-            {
-                var confirmed = await _apiClient.GetMyCheckIn(session.Id, CancellationToken.None) is not null;
-                var isOpen = now >= session.OpenFrom && now <= session.OpenUntil && !confirmed;
-                AttendanceItems.Add(new AttendanceItem(
-                    session.Id,
-                    lecture.SubjectName,
-                    lecture.Room,
-                    lecture.StartsAt,
-                    lecture.EndsAt,
-                    confirmed,
-                    isOpen));
-            }
+            selectedSession = sessions.FirstOrDefault(item => item.Session.OpenFrom.ToUniversalTime() > now);
+        }
+
+        if (selectedSession != default)
+        {
+            var confirmed = await _apiClient.GetMyCheckIn(
+                selectedSession.Session.Id, CancellationToken.None) is not null;
+            AttendanceItems.Add(new AttendanceItem(
+                selectedSession.Session.Id,
+                selectedSession.Lecture.SubjectName,
+                selectedSession.Lecture.Room,
+                selectedSession.Lecture.StartsAt,
+                selectedSession.Lecture.EndsAt,
+                confirmed,
+                !confirmed
+                    && now >= selectedSession.Session.OpenFrom.ToUniversalTime()
+                    && now <= selectedSession.Session.OpenUntil.ToUniversalTime()));
         }
 
         var activeSession = AttendanceItems.FirstOrDefault(item => item.IsOpen);
@@ -482,17 +502,22 @@ public partial class MainPage : ContentPage
     {
         ProfessorAttendances.Clear();
         var now = DateTime.UtcNow;
-        var activeSession = _nextLecture?.AttendanceSessions
-            .FirstOrDefault(session => now >= session.OpenFrom && now <= session.OpenUntil);
-        if (activeSession is null || _nextLecture is null)
+        var activeLectureSession = EditableLectures
+            .OrderBy(item => item.StartsAt)
+            .SelectMany(lecture => lecture.AttendanceSessions
+                .Select(session => (Lecture: lecture, Session: session)))
+            .FirstOrDefault(item =>
+                now >= item.Session.OpenFrom.ToUniversalTime()
+                && now <= item.Session.OpenUntil.ToUniversalTime());
+        if (activeLectureSession == default)
         {
             return;
         }
 
         var attendances = await _apiClient.GetProfessorSubjectAttendancesAsync(
-            _nextLecture.SubjectId, CancellationToken.None);
+            activeLectureSession.Lecture.SubjectId, CancellationToken.None);
         foreach (var attendance in attendances
-            .Where(attendance => attendance.AttendanceSessionId == activeSession.Id)
+            .Where(attendance => attendance.AttendanceSessionId == activeLectureSession.Session.Id)
             .OrderBy(attendance => attendance.StudentName))
         {
             ProfessorAttendances.Add(attendance);
@@ -503,7 +528,7 @@ public partial class MainPage : ContentPage
     {
         var now = DateTime.UtcNow;
         var weekStart = StartOfScheduleWeek(now);
-        var weekEnd = weekStart.AddDays(5);
+        var weekEnd = weekStart.AddDays(7);
         var lectures = IsStudent
             ? await _apiClient.GetStudentScheduleAsync(weekStart, weekEnd, CancellationToken.None)
             : await _apiClient.GetProfessorScheduleAsync(weekStart, weekEnd, CancellationToken.None);
@@ -511,7 +536,7 @@ public partial class MainPage : ContentPage
         ScheduleItems.Clear();
         EditableLectures.Clear();
         _nextLecture = lectures
-            .Where(lecture => lecture.EndsAt.ToUniversalTime() >= now)
+            .Where(lecture => lecture.StartsAt.ToUniversalTime() > now)
             .OrderBy(lecture => lecture.StartsAt)
             .FirstOrDefault();
         foreach (var lecture in lectures)
@@ -536,9 +561,7 @@ public partial class MainPage : ContentPage
     {
         var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
         var start = date.Date.AddDays(-daysSinceMonday);
-        return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
-            ? start.AddDays(7)
-            : start;
+        return start;
     }
 
     private void ShowValidationMessage(string message)

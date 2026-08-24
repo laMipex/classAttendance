@@ -39,7 +39,7 @@ public sealed class ProfessorController(
         CancellationToken cancellationToken)
     {
         var start = from ?? StartOfScheduleWeek(DateTime.UtcNow);
-        var end = until ?? start.AddDays(5);
+        var end = until ?? start.AddDays(7);
         if (end <= start)
         {
             return BadRequest(new { error = "The schedule end must be after its start." });
@@ -76,8 +76,6 @@ public sealed class ProfessorController(
     {
         var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
         var start = date.Date.AddDays(-daysSinceMonday);
-        return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
-            ? start.AddDays(7)
-            : start;
+        return start;
     }
 }
