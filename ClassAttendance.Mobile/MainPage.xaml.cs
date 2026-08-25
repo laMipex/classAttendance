@@ -466,11 +466,11 @@ public partial class MainPage : ContentPage
                 .Select(session => (Lecture: lecture, Session: session)))
             .ToList();
         var selectedSession = sessions.FirstOrDefault(item =>
-            now >= item.Session.OpenFrom.ToUniversalTime()
-            && now <= item.Session.OpenUntil.ToUniversalTime());
+            now >= AsUtc(item.Session.OpenFrom)
+            && now <= AsUtc(item.Session.OpenUntil));
         if (selectedSession == default)
         {
-            selectedSession = sessions.FirstOrDefault(item => item.Session.OpenFrom.ToUniversalTime() > now);
+            selectedSession = sessions.FirstOrDefault(item => AsUtc(item.Session.OpenFrom) > now);
         }
 
         if (selectedSession != default)
@@ -485,8 +485,8 @@ public partial class MainPage : ContentPage
                 selectedSession.Lecture.EndsAt,
                 confirmed,
                 !confirmed
-                    && now >= selectedSession.Session.OpenFrom.ToUniversalTime()
-                    && now <= selectedSession.Session.OpenUntil.ToUniversalTime()));
+                && now >= AsUtc(selectedSession.Session.OpenFrom)
+                && now <= AsUtc(selectedSession.Session.OpenUntil)));
         }
 
         var activeSession = AttendanceItems.FirstOrDefault(item => item.IsOpen);
@@ -507,8 +507,8 @@ public partial class MainPage : ContentPage
             .SelectMany(lecture => lecture.AttendanceSessions
                 .Select(session => (Lecture: lecture, Session: session)))
             .FirstOrDefault(item =>
-                now >= item.Session.OpenFrom.ToUniversalTime()
-                && now <= item.Session.OpenUntil.ToUniversalTime());
+                now >= AsUtc(item.Session.OpenFrom)
+                && now <= AsUtc(item.Session.OpenUntil));
         if (activeLectureSession == default)
         {
             return;
@@ -524,6 +524,11 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private static DateTime AsUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
     private async Task LoadScheduleAsync()
     {
         var now = DateTime.UtcNow;
@@ -536,7 +541,7 @@ public partial class MainPage : ContentPage
         ScheduleItems.Clear();
         EditableLectures.Clear();
         _nextLecture = lectures
-            .Where(lecture => lecture.StartsAt.ToUniversalTime() > now)
+            .Where(lecture => AsUtc(lecture.StartsAt) > now)
             .OrderBy(lecture => lecture.StartsAt)
             .FirstOrDefault();
         foreach (var lecture in lectures)
