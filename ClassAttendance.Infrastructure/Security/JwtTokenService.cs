@@ -1,7 +1,7 @@
 using ClassAttendance.Application.Dtos.Auth;
 using ClassAttendance.Domain.Entities;
 using Microsoft.IdentityModel.Tokens;
-using Newtonsoft.Json.Linq;
+
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;

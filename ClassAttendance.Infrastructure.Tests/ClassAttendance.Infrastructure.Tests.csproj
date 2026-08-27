@@ -20,8 +20,13 @@
     </PackageReference>
   </ItemGroup>
 
+
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClassAttendance.Infrastructure\ClassAttendance.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

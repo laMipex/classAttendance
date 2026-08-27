@@ -18,8 +18,11 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<QuizSummaryResponse>>> GetAvailable(CancellationToken cancellationToken)
     {
         var studentId = GetUserId();
+        var now = DateTime.UtcNow;
         var quizzes = await dbContext.QuizSessions
             .Where(quiz => quiz.isActive
+                && quiz.StartsAt <= now
+                && quiz.EndsAt >= now
                 && dbContext.Enrollments.Any(enrollment =>
                     enrollment.StudentId == studentId
                     && enrollment.SubjectId == quiz.Lecture.SubjectId
@@ -162,13 +165,21 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
             .Select(candidate => new
             {
                 candidate.Id,
-                candidate.Title
+                candidate.Title,
+                candidate.StartsAt,
+                candidate.EndsAt
             })
             .SingleOrDefaultAsync(cancellationToken);
 
         if (quiz is null)
         {
             return NotFound();
+        }
+
+        var now = DateTime.UtcNow;
+        if (quiz.StartsAt > now || quiz.EndsAt < now)
+        {
+            return Conflict(new { error = "This quiz is not currently open." });
         }
 
         if (await dbContext.QuizResponses.AnyAsync(
@@ -258,6 +269,12 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
         if (quiz is null)
         {
             return NotFound();
+        }
+
+        var now = DateTime.UtcNow;
+        if (quiz.StartsAt > now || quiz.EndsAt < now)
+        {
+            return Conflict(new { error = "This quiz is not currently open." });
         }
 
         if (await dbContext.QuizResponses.AnyAsync(

@@ -10,8 +10,6 @@ public partial class MainPage : ContentPage
     private AppSection _activeSection = AppSection.Dashboard;
     private bool _isLoginSubmitting;
     private bool _isStudent;
-    private bool _isAttendanceConfirmed;
-    private int? _activeAttendanceSessionId;
     private int? _editingLectureId;
     private ScheduleLectureResponse? _nextLecture;
     private readonly ClassAttendanceApiClient _apiClient = new();
@@ -64,13 +62,6 @@ public partial class MainPage : ContentPage
     public string LessonTime => _nextLecture is null
         ? string.Empty
         : $"{_nextLecture.StartsAt.ToLocalTime():dd-MM-yyyy HH:mm} - {_nextLecture.EndsAt.ToLocalTime():HH:mm}";
-    public string AttendanceButtonText => _isAttendanceConfirmed ? "Attendance confirmed" : "Confirm attendance";
-    public bool IsAttendanceCheckInOpen { get; private set; }
-    public string AttendanceAvailabilityMessage => _isAttendanceConfirmed
-        ? "Your attendance has been recorded."
-        : IsAttendanceCheckInOpen
-            ? "Attendance is open for this class."
-            : "Attendance can be confirmed only while the class attendance session is open.";
     public string ScheduleDescription => IsStudent ? "All classes for your programme." : "Your teaching schedule.";
     public string ProfileSummary => IsStudent ? "Student account · Class attendance enabled" : "Professor account · Attendance and quiz management enabled";
     public QuizQuestionResponse? ActiveQuestion { get; private set; }
@@ -415,10 +406,7 @@ public partial class MainPage : ContentPage
         IsAppVisible = false;
         _apiClient.ClearAuthorization();
         _isStudent = false;
-        _isAttendanceConfirmed = false;
-        _activeAttendanceSessionId = null;
         _editingLectureId = null;
-        IsAttendanceCheckInOpen = false;
         ProfessorAttendances.Clear();
         IndexEntry.Text = string.Empty;
         EmailEntry.Text = string.Empty;
@@ -452,8 +440,6 @@ public partial class MainPage : ContentPage
     private async Task LoadAttendanceSessionAsync()
     {
         AttendanceItems.Clear();
-        _isAttendanceConfirmed = false;
-        _activeAttendanceSessionId = null;
         var now = DateTime.UtcNow;
         var lectures = await _apiClient.GetStudentScheduleAsync(
             now.Date,
@@ -489,13 +475,6 @@ public partial class MainPage : ContentPage
                 && now <= AsUtc(selectedSession.Session.OpenUntil)));
         }
 
-        var activeSession = AttendanceItems.FirstOrDefault(item => item.IsOpen);
-        _activeAttendanceSessionId = activeSession?.Id;
-        _isAttendanceConfirmed = activeSession?.IsConfirmed == true;
-        IsAttendanceCheckInOpen = activeSession is not null;
-        OnPropertyChanged(nameof(AttendanceButtonText));
-        OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
-        OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
     }
 
     private async Task LoadProfessorAttendancesAsync()
@@ -593,9 +572,6 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(RoleDescription));
         OnPropertyChanged(nameof(ScheduleDescription));
         OnPropertyChanged(nameof(ProfileSummary));
-        OnPropertyChanged(nameof(AttendanceButtonText));
-        OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
-        OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
     }
 
     private void SetProperty(ref bool field, bool value, [CallerMemberName] string? propertyName = null)
