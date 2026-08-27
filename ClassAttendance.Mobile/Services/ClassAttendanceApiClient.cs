@@ -12,10 +12,16 @@ public sealed class ClassAttendanceApiClient
     public ClassAttendanceApiClient()
     {
         var baseAddress = DeviceInfo.Platform == DevicePlatform.Android
-            ? "http://10.0.2.2:5228/"
+            ? DeviceInfo.DeviceType == DeviceType.Virtual
+                ? "http://10.0.2.2:5228/"
+                : "http://localhost:5228/"
             : "http://localhost:5228/";
 
-        _httpClient = new HttpClient { BaseAddress = new Uri(baseAddress) };
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(baseAddress),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
     }
 
     public async Task<LoginResponse?> LoginAsync(string? index, string? email, string password, CancellationToken cancellationToken)
