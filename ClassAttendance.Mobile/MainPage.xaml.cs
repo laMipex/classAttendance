@@ -176,6 +176,7 @@ public partial class MainPage : ContentPage
     private async void OnDashboardClicked(object? sender, EventArgs e)
     {
         ShowSection(AppSection.Dashboard);
+        await LoadQuizzesAsync();
         if (IsProfessor)
         {
             await LoadProfessorAttendancesAsync();

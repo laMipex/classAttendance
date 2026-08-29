@@ -89,8 +89,9 @@ x:Name="MainPageRoot"
                         </Border>
                         <VerticalStackLayout IsVisible="{Binding IsStudent}" Spacing="10">
                             <Label Text="Active quizzes" Style="{StaticResource SectionTitle}" />
-                            <CollectionView ItemsSource="{Binding StudentQuizzes}" SelectionMode="None">
-                                <CollectionView.ItemTemplate>
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding StudentQuizzes}"
+                                                 Spacing="10">
+                                <BindableLayout.ItemTemplate>
                                     <DataTemplate>
                                         <Border Style="{StaticResource ListCard}"
                                                 IsEnabled="{Binding CanOpen}">
@@ -113,8 +114,8 @@ x:Name="MainPageRoot"
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
-                                </CollectionView.ItemTemplate>
-                            </CollectionView>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
                         </VerticalStackLayout>
                         <VerticalStackLayout IsVisible="{Binding IsProfessor}" Spacing="10">
                             <Label Text="Students present" Style="{StaticResource SectionTitle}" />
