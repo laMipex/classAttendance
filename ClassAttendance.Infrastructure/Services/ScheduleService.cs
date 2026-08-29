@@ -20,15 +20,15 @@ public sealed class ScheduleService(ILectureRepository lectureRepository) : ISch
             lecture.Subject.Code,
             lecture.Subject.Name,
             $"{lecture.Professor.User.FirstName} {lecture.Professor.User.LastName}",
-            lecture.StartsAt,
-            lecture.EndsAt,
+            AsUtc(lecture.StartsAt),
+            AsUtc(lecture.EndsAt),
             lecture.Rooms,
             lecture.AttendanceSessions
                 .OrderBy(session => session.OpenFrom)
                 .Select(session => new ScheduleAttendanceSessionDto(
                     session.Id,
-                    session.OpenFrom,
-                    session.OpenUntil))
+                    AsUtc(session.OpenFrom),
+                    AsUtc(session.OpenUntil)))
                 .ToList())).ToList();
     }
 
@@ -66,12 +66,15 @@ public sealed class ScheduleService(ILectureRepository lectureRepository) : ISch
                 lecture.Subject.Code,
                 lecture.Subject.Name,
                 $"{lecture.Professor.User.FirstName} {lecture.Professor.User.LastName}",
-                lecture.StartsAt,
-                lecture.EndsAt,
+                AsUtc(lecture.StartsAt),
+                AsUtc(lecture.EndsAt),
                 lecture.Rooms,
                 lecture.AttendanceSessions
                     .OrderBy(session => session.OpenFrom)
                     .Select(session => new ScheduleAttendanceSessionDto(
-                        session.Id, session.OpenFrom, session.OpenUntil))
+                        session.Id, AsUtc(session.OpenFrom), AsUtc(session.OpenUntil)))
                     .ToList());
+
+    private static DateTime AsUtc(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Utc);
 }

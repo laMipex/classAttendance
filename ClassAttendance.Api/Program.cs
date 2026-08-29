@@ -67,8 +67,11 @@ using (var scope = app.Services.CreateScope())
     await Seed.SeedAsync(dbContext);
 }
 
-// Configure the HTTP request pipeline.
-app.UseHttpsRedirection();
+// Keep the local HTTP endpoint available for Android USB/ADB development.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

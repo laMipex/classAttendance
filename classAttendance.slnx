@@ -9,8 +9,6 @@
     </Project>
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="ClassAttendance.Api.Tests/ClassAttendance.Api.Tests.csproj" Id="5f2f1dff-fbb4-491e-9988-5ae51c01f602" />
-    <Project Path="ClassAttendance.Application.Tests/ClassAttendance.Application.Tests.csproj" Id="f29fc6fd-83cf-4dc6-8328-55b399930122" />
-    <Project Path="ClassAttendance.Infrastructure.Tests/ClassAttendance.Infrastructure.Tests.csproj" Id="5340bca0-ec1f-48c2-8d34-b402dc14200d" />
+    <Project Path="ClassAttendance.Infrastructure.Tests/ClassAttendance.Infrastructure.Tests.csproj" Id="5c1994db-2183-4963-a81e-9109896337e2" />
   </Folder>
 </Solution>

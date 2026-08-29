@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace ClassAttendance.Mobile.Services;
 
@@ -11,10 +12,16 @@ public sealed class ClassAttendanceApiClient
     public ClassAttendanceApiClient()
     {
         var baseAddress = DeviceInfo.Platform == DevicePlatform.Android
-            ? "http://10.0.2.2:5228/"
+            ? DeviceInfo.DeviceType == DeviceType.Virtual
+                ? "http://10.0.2.2:5228/"
+                : "http://localhost:5228/"
             : "http://localhost:5228/";
 
-        _httpClient = new HttpClient { BaseAddress = new Uri(baseAddress) };
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(baseAddress),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
     }
 
     public async Task<LoginResponse?> LoginAsync(string? index, string? email, string password, CancellationToken cancellationToken)
@@ -97,15 +104,44 @@ public sealed class ClassAttendanceApiClient
 
         if (response.StatusCode == HttpStatusCode.Conflict)
         {
-            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            var error = await ReadErrorAsync(response, cancellationToken);
             if (error.Contains("already checked in", StringComparison.OrdinalIgnoreCase))
             {
                 throw new AttendanceAlreadyConfirmedException();
             }
+
+            throw new HttpRequestException(error);
         }
 
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CheckInResponse>(cancellationToken))!;
+    }
+
+    private static async Task<string> ReadErrorAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return $"The server returned {(int)response.StatusCode} ({response.ReasonPhrase}).";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(content);
+            if (document.RootElement.TryGetProperty("error", out var error)
+                && error.ValueKind == JsonValueKind.String)
+            {
+                return error.GetString()!;
+            }
+        }
+        catch (JsonException)
+        {
+            // Fall back to the response body when the server did not return JSON.
+        }
+
+        return content;
     }
 
     public async Task<CheckInResponse?> GetMyCheckIn(

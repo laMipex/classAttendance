@@ -18,12 +18,15 @@ public sealed class QuizController(DataContext dbContext) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<QuizSummaryResponse>>> GetAvailable(CancellationToken cancellationToken)
     {
         var studentId = GetUserId();
-        var quizzes = await dbContext.QuizSessions
-            .Where(quiz => quiz.isActive
-                && dbContext.Enrollments.Any(enrollment =>
-                    enrollment.StudentId == studentId
-                    && enrollment.SubjectId == quiz.Lecture.SubjectId
-                    && enrollment.Status == "Active"))
+        var quizzes = await (
+            from quiz in dbContext.QuizSessions
+            join enrollment in dbContext.Enrollments
+                on quiz.Lecture.SubjectId equals enrollment.SubjectId
+            where quiz.isActive
+                && enrollment.StudentId == studentId
+                && enrollment.Status == "Active"
+            select quiz)
+            .Distinct()
             .OrderBy(quiz => quiz.EndsAt)
             .Select(quiz => new QuizSummaryResponse(
                 quiz.Id,

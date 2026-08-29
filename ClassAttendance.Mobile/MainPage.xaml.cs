@@ -10,8 +10,6 @@ public partial class MainPage : ContentPage
     private AppSection _activeSection = AppSection.Dashboard;
     private bool _isLoginSubmitting;
     private bool _isStudent;
-    private bool _isAttendanceConfirmed;
-    private int? _activeAttendanceSessionId;
     private int? _editingLectureId;
     private ScheduleLectureResponse? _nextLecture;
     private readonly ClassAttendanceApiClient _apiClient = new();
@@ -64,13 +62,6 @@ public partial class MainPage : ContentPage
     public string LessonTime => _nextLecture is null
         ? string.Empty
         : $"{_nextLecture.StartsAt.ToLocalTime():dd-MM-yyyy HH:mm} - {_nextLecture.EndsAt.ToLocalTime():HH:mm}";
-    public string AttendanceButtonText => _isAttendanceConfirmed ? "Attendance confirmed" : "Confirm attendance";
-    public bool IsAttendanceCheckInOpen { get; private set; }
-    public string AttendanceAvailabilityMessage => _isAttendanceConfirmed
-        ? "Your attendance has been recorded."
-        : IsAttendanceCheckInOpen
-            ? "Attendance is open for this class."
-            : "Attendance can be confirmed only while the class attendance session is open.";
     public string ScheduleDescription => IsStudent ? "All classes for your programme." : "Your teaching schedule.";
     public string ProfileSummary => IsStudent ? "Student account · Class attendance enabled" : "Professor account · Attendance and quiz management enabled";
     public QuizQuestionResponse? ActiveQuestion { get; private set; }
@@ -185,6 +176,7 @@ public partial class MainPage : ContentPage
     private async void OnDashboardClicked(object? sender, EventArgs e)
     {
         ShowSection(AppSection.Dashboard);
+        await LoadQuizzesAsync();
         if (IsProfessor)
         {
             await LoadProfessorAttendancesAsync();
@@ -415,10 +407,7 @@ public partial class MainPage : ContentPage
         IsAppVisible = false;
         _apiClient.ClearAuthorization();
         _isStudent = false;
-        _isAttendanceConfirmed = false;
-        _activeAttendanceSessionId = null;
         _editingLectureId = null;
-        IsAttendanceCheckInOpen = false;
         ProfessorAttendances.Clear();
         IndexEntry.Text = string.Empty;
         EmailEntry.Text = string.Empty;
@@ -452,8 +441,6 @@ public partial class MainPage : ContentPage
     private async Task LoadAttendanceSessionAsync()
     {
         AttendanceItems.Clear();
-        _isAttendanceConfirmed = false;
-        _activeAttendanceSessionId = null;
         var now = DateTime.UtcNow;
         var lectures = await _apiClient.GetStudentScheduleAsync(
             now.Date,
@@ -466,11 +453,11 @@ public partial class MainPage : ContentPage
                 .Select(session => (Lecture: lecture, Session: session)))
             .ToList();
         var selectedSession = sessions.FirstOrDefault(item =>
-            now >= item.Session.OpenFrom.ToUniversalTime()
-            && now <= item.Session.OpenUntil.ToUniversalTime());
+            now >= AsUtc(item.Session.OpenFrom)
+            && now <= AsUtc(item.Session.OpenUntil));
         if (selectedSession == default)
         {
-            selectedSession = sessions.FirstOrDefault(item => item.Session.OpenFrom.ToUniversalTime() > now);
+            selectedSession = sessions.FirstOrDefault(item => AsUtc(item.Session.OpenFrom) > now);
         }
 
         if (selectedSession != default)
@@ -485,17 +472,10 @@ public partial class MainPage : ContentPage
                 selectedSession.Lecture.EndsAt,
                 confirmed,
                 !confirmed
-                    && now >= selectedSession.Session.OpenFrom.ToUniversalTime()
-                    && now <= selectedSession.Session.OpenUntil.ToUniversalTime()));
+                && now >= AsUtc(selectedSession.Session.OpenFrom)
+                && now <= AsUtc(selectedSession.Session.OpenUntil)));
         }
 
-        var activeSession = AttendanceItems.FirstOrDefault(item => item.IsOpen);
-        _activeAttendanceSessionId = activeSession?.Id;
-        _isAttendanceConfirmed = activeSession?.IsConfirmed == true;
-        IsAttendanceCheckInOpen = activeSession is not null;
-        OnPropertyChanged(nameof(AttendanceButtonText));
-        OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
-        OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
     }
 
     private async Task LoadProfessorAttendancesAsync()
@@ -507,8 +487,8 @@ public partial class MainPage : ContentPage
             .SelectMany(lecture => lecture.AttendanceSessions
                 .Select(session => (Lecture: lecture, Session: session)))
             .FirstOrDefault(item =>
-                now >= item.Session.OpenFrom.ToUniversalTime()
-                && now <= item.Session.OpenUntil.ToUniversalTime());
+                now >= AsUtc(item.Session.OpenFrom)
+                && now <= AsUtc(item.Session.OpenUntil));
         if (activeLectureSession == default)
         {
             return;
@@ -524,6 +504,11 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private static DateTime AsUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
     private async Task LoadScheduleAsync()
     {
         var now = DateTime.UtcNow;
@@ -536,7 +521,7 @@ public partial class MainPage : ContentPage
         ScheduleItems.Clear();
         EditableLectures.Clear();
         _nextLecture = lectures
-            .Where(lecture => lecture.StartsAt.ToUniversalTime() > now)
+            .Where(lecture => AsUtc(lecture.StartsAt) > now)
             .OrderBy(lecture => lecture.StartsAt)
             .FirstOrDefault();
         foreach (var lecture in lectures)
@@ -588,9 +573,6 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(RoleDescription));
         OnPropertyChanged(nameof(ScheduleDescription));
         OnPropertyChanged(nameof(ProfileSummary));
-        OnPropertyChanged(nameof(AttendanceButtonText));
-        OnPropertyChanged(nameof(IsAttendanceCheckInOpen));
-        OnPropertyChanged(nameof(AttendanceAvailabilityMessage));
     }
 
     private void SetProperty(ref bool field, bool value, [CallerMemberName] string? propertyName = null)
