@@ -51,6 +51,7 @@ public sealed class JwtTokenService
             user.Id,
             user.FirstName,
             user.Email,
-            user.Role);
+            user.Role,
+            user.TwoFactorEnabled);
     }
 }

@@ -1,6 +1,7 @@
 ﻿using ClassAttendance.Mobile.Services;
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace ClassAttendance.Mobile;
@@ -10,6 +11,10 @@ public partial class MainPage : ContentPage
     private AppSection _activeSection = AppSection.Dashboard;
     private bool _isLoginSubmitting;
     private bool _isStudent;
+    private bool _isChatOpen;
+    private bool _twoFactorEnabled;
+    private TaskCompletionSource<bool>? _authenticatorSetupCompletion;
+    private string _authenticatorSecret = string.Empty;
     private int? _editingLectureId;
     private ScheduleLectureResponse? _nextLecture;
     private readonly ClassAttendanceApiClient _apiClient = new();
@@ -30,11 +35,21 @@ public partial class MainPage : ContentPage
     public ObservableCollection<AttendanceItem> AttendanceItems { get; } = [];
     public ObservableCollection<ScheduleLectureResponse> EditableLectures { get; } = [];
     public ObservableCollection<SubjectAttendanceResponse> ProfessorAttendances { get; } = [];
+    public ObservableCollection<ChatItem> ChatMessages { get; } = [];
+    public bool IsChatOpen
+    {
+        get => _isChatOpen;
+        private set => SetProperty(ref _isChatOpen, value);
+    }
+    public bool IsChatButtonVisible => IsAppVisible && !IsChatOpen;
 
     public bool IsLoginVisible => !IsAppVisible;
     public bool IsAppVisible { get; private set; }
     public bool IsStudent => _isStudent;
     public bool IsProfessor => !_isStudent;
+    public string TwoFactorButtonText => _twoFactorEnabled ? "Remove 2FA" : "Set Up 2FA";
+    public bool IsAuthenticatorSetupVisible => _authenticatorSetupCompletion is not null;
+    public string AuthenticatorSecret => _authenticatorSecret;
     public bool IsDashboardVisible => IsAppVisible && _activeSection == AppSection.Dashboard;
     public bool IsScheduleVisible => IsAppVisible && _activeSection == AppSection.Schedule;
     public bool IsProfileVisible => IsAppVisible && _activeSection == AppSection.Profile;
@@ -107,10 +122,19 @@ public partial class MainPage : ContentPage
 
         try
         {
+            var twoFactorRequired = await _apiClient.IsTwoFactorEnabledAsync(
+                index.Length > 0 ? index : null,
+                email.Length > 0 ? email : null,
+                CancellationToken.None);
+            var twoFactorCode = twoFactorRequired
+                ? await DisplayPromptAsync("2FA required", "Enter the six-digit code from your authenticator app:", maxLength: 6, keyboard: Keyboard.Numeric)
+                : null;
+
             var loginResult = await _apiClient.LoginAsync(
                 index.Length > 0 ? index : null,
                 email.Length > 0 ? email : null,
                 password,
+                twoFactorCode?.Trim(),
                 CancellationToken.None);
 
             if (loginResult is null)
@@ -123,6 +147,7 @@ public partial class MainPage : ContentPage
             _apiClient.SetAuthorization(loginResult.Token);
             UserIdentifier = _isStudent ? index : email;
             UserName = loginResult.FirstName;
+            _twoFactorEnabled = loginResult.TwoFactorEnabled;
             _activeSection = AppSection.Dashboard;
             IsAppVisible = true;
             await LoadScheduleAsync();
@@ -145,6 +170,87 @@ public partial class MainPage : ContentPage
         {
             IsLoginSubmitting = false;
         }
+    }
+
+    private void OnChatToggleClicked(object? sender, EventArgs e)
+    {
+        IsChatOpen = !IsChatOpen;
+        OnPropertyChanged(nameof(IsChatButtonVisible));
+    }
+
+    private async void OnChatSendClicked(object? sender, EventArgs e)
+    {
+        var text = ChatEntry.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(text)) return;
+        ChatMessages.Add(new ChatItem($"You: {text}"));
+        ChatEntry.Text = string.Empty;
+        try
+        {
+            var response = await _apiClient.SendChatMessageAsync(text, CancellationToken.None);
+            ChatMessages.Add(new ChatItem($"Bot: {response}"));
+        }
+        catch (HttpRequestException)
+        {
+            ChatMessages.Add(new ChatItem("Bot: Can't reach the server at the moment."));
+        }
+        catch (TaskCanceledException)
+        {
+            ChatMessages.Add(new ChatItem("Bot: Gemini took too long to respond. Please try again."));
+        }
+        catch (JsonException)
+        {
+            ChatMessages.Add(new ChatItem("Bot: The server returned an invalid response. Please try again."));
+        }
+        catch (InvalidOperationException)
+        {
+            ChatMessages.Add(new ChatItem("Bot: Can't read the assistant's response. Please try again."));
+        }
+    }
+
+    private async void OnTwoFactorSetupClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_twoFactorEnabled)
+            {
+                var removalCode = await DisplayPromptAsync("Remove 2FA", "Enter the current six-digit authenticator code:", maxLength: 6, keyboard: Keyboard.Numeric);
+                if (string.IsNullOrWhiteSpace(removalCode)) return;
+                await _apiClient.DisableTwoFactorAsync(removalCode.Trim(), CancellationToken.None);
+                _twoFactorEnabled = false;
+                OnPropertyChanged(nameof(TwoFactorButtonText));
+                await DisplayAlertAsync("2FA removed", "Two-factor authentication has been disabled.", "OK");
+                return;
+            }
+
+            var setup = await _apiClient.BeginTwoFactorSetupAsync(CancellationToken.None);
+            _authenticatorSecret = setup.Secret;
+            _authenticatorSetupCompletion = new TaskCompletionSource<bool>();
+            OnPropertyChanged(nameof(AuthenticatorSecret));
+            OnPropertyChanged(nameof(IsAuthenticatorSetupVisible));
+            await _authenticatorSetupCompletion.Task;
+            var verificationCode = await DisplayPromptAsync("Confirm authenticator", "Enter the current six-digit code:", maxLength: 6, keyboard: Keyboard.Numeric);
+            if (string.IsNullOrWhiteSpace(verificationCode)) return;
+            await _apiClient.EnableTwoFactorAsync(verificationCode.Trim(), CancellationToken.None);
+            _twoFactorEnabled = true;
+            OnPropertyChanged(nameof(TwoFactorButtonText));
+            await DisplayAlertAsync("Authenticator enabled", "Two-factor authentication is now required at login.", "OK");
+        }
+        catch (HttpRequestException)
+        {
+            await DisplayAlertAsync("2FA error", "The authenticator operation could not be completed. Check that the code is current and try again.", "OK");
+        }
+    }
+
+    private async void OnAuthenticatorSecretClicked(object? sender, EventArgs e)
+    {
+        await Clipboard.Default.SetTextAsync(AuthenticatorSecret);
+    }
+
+    private void OnAuthenticatorContinueClicked(object? sender, EventArgs e)
+    {
+        _authenticatorSetupCompletion?.TrySetResult(true);
+        _authenticatorSetupCompletion = null;
+        OnPropertyChanged(nameof(IsAuthenticatorSetupVisible));
     }
 
     private async void OnAttendanceClicked(object? sender, EventArgs e)
@@ -407,11 +513,16 @@ public partial class MainPage : ContentPage
         IsAppVisible = false;
         _apiClient.ClearAuthorization();
         _isStudent = false;
+        _twoFactorEnabled = false;
+        _authenticatorSetupCompletion?.TrySetResult(false);
+        _authenticatorSetupCompletion = null;
         _editingLectureId = null;
         ProfessorAttendances.Clear();
         IndexEntry.Text = string.Empty;
         EmailEntry.Text = string.Empty;
         PasswordEntry.Text = string.Empty;
+        ChatMessages.Clear();
+        IsChatOpen = false;
         ValidationMessage.IsVisible = false;
         NotifyAppStateChanged();
     }
@@ -524,6 +635,16 @@ public partial class MainPage : ContentPage
             .Where(lecture => AsUtc(lecture.StartsAt) > now)
             .OrderBy(lecture => lecture.StartsAt)
             .FirstOrDefault();
+        if (_nextLecture is null)
+        {
+            var nextWeekLectures = IsStudent
+                ? await _apiClient.GetStudentScheduleAsync(weekEnd, weekEnd.AddDays(7), CancellationToken.None)
+                : await _apiClient.GetProfessorScheduleAsync(weekEnd, weekEnd.AddDays(7), CancellationToken.None);
+            _nextLecture = nextWeekLectures
+                .Where(lecture => AsUtc(lecture.StartsAt) > now)
+                .OrderBy(lecture => lecture.StartsAt)
+                .FirstOrDefault();
+        }
         foreach (var lecture in lectures)
         {
             ScheduleItems.Add(new ScheduleItem(
@@ -569,10 +690,13 @@ public partial class MainPage : ContentPage
         OnPropertyChanged(nameof(IsQuizResponsesVisible));
         OnPropertyChanged(nameof(IsLectureEditorVisible));
         OnPropertyChanged(nameof(UserRole));
+        OnPropertyChanged(nameof(TwoFactorButtonText));
         OnPropertyChanged(nameof(WelcomeText));
         OnPropertyChanged(nameof(RoleDescription));
         OnPropertyChanged(nameof(ScheduleDescription));
         OnPropertyChanged(nameof(ProfileSummary));
+        OnPropertyChanged(nameof(IsChatOpen));
+        OnPropertyChanged(nameof(IsChatButtonVisible));
     }
 
     private void SetProperty(ref bool field, bool value, [CallerMemberName] string? propertyName = null)
@@ -597,6 +721,45 @@ public partial class MainPage : ContentPage
         QuizEditor,
         QuizAnswer,
         QuizResponses
+    }
+
+    public sealed class ChatItem
+    {
+        public ChatItem(string text)
+        {
+            Text = text;
+            FormattedText = CreateFormattedText(text);
+        }
+
+        public string Text { get; }
+        public FormattedString FormattedText { get; }
+
+        private static FormattedString CreateFormattedText(string text)
+        {
+            var formattedText = new FormattedString();
+            var position = 0;
+            foreach (Match match in Regex.Matches(text, @"\*\*(.+?)\*\*"))
+            {
+                if (match.Index > position)
+                {
+                    formattedText.Spans.Add(new Span { Text = text[position..match.Index] });
+                }
+
+                formattedText.Spans.Add(new Span
+                {
+                    Text = match.Groups[1].Value,
+                    FontFamily = "RobotoBold"
+                });
+                position = match.Index + match.Length;
+            }
+
+            if (position < text.Length)
+            {
+                formattedText.Spans.Add(new Span { Text = text[position..] });
+            }
+
+            return formattedText;
+        }
     }
 
     public sealed record QuizItem(int Id, string Title, string Detail, bool IsVisible, bool IsSubmitted)

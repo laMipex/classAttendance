@@ -24,11 +24,11 @@ public sealed class ClassAttendanceApiClient
         };
     }
 
-    public async Task<LoginResponse?> LoginAsync(string? index, string? email, string password, CancellationToken cancellationToken)
+    public async Task<LoginResponse?> LoginAsync(string? index, string? email, string password, string? twoFactorCode, CancellationToken cancellationToken)
     {
         var response = await _httpClient.PostAsJsonAsync(
             "auth/login",
-            new LoginRequest(index, email, password),
+            new LoginRequest(index, email, password, twoFactorCode),
             cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
@@ -38,6 +38,53 @@ public sealed class ClassAttendanceApiClient
 
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken);
+    }
+
+    public async Task<string> SendChatMessageAsync(string message, CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.PostAsJsonAsync("chatbot/message", new ChatMessageRequest(message), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<ChatMessageResponse>(cancellationToken);
+        if (result is null || string.IsNullOrWhiteSpace(result.Message))
+        {
+            throw new InvalidOperationException("The assistant returned an empty response.");
+        }
+
+        return result.Message;
+    }
+
+    public async Task<TwoFactorSetupResponse> BeginTwoFactorSetupAsync(CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.PostAsync("auth/two-factor/setup", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<TwoFactorSetupResponse>(cancellationToken))!;
+    }
+
+    public async Task EnableTwoFactorAsync(string code, CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.PostAsJsonAsync("auth/two-factor/enable", new TwoFactorCodeRequest(code), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DisableTwoFactorAsync(string code, CancellationToken cancellationToken)
+    {
+        var response = await _httpClient.PostAsJsonAsync("auth/two-factor/disable", new TwoFactorCodeRequest(code), cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException(string.IsNullOrWhiteSpace(message) ? "The authenticator code is invalid." : message);
+        }
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<bool> IsTwoFactorEnabledAsync(string? index, string? email, CancellationToken cancellationToken)
+    {
+        var query = index is not null
+            ? $"index={Uri.EscapeDataString(index)}"
+            : $"email={Uri.EscapeDataString(email ?? string.Empty)}";
+        var response = await _httpClient.GetAsync($"auth/two-factor/status?{query}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<bool>(cancellationToken);
     }
 
     public void SetAuthorization(string token) =>
@@ -202,8 +249,12 @@ public sealed class ClassAttendanceApiClient
     }
 }
 
-public sealed record LoginRequest(string? Index, string? Email, string Password);
-public sealed record LoginResponse(string Token, DateTime Expiration, int UserId, string FirstName, string Email, string Role);
+public sealed record LoginRequest(string? Index, string? Email, string Password, string? TwoFactorCode);
+public sealed record ChatMessageRequest(string Message);
+public sealed record ChatMessageResponse(string Message);
+public sealed record TwoFactorSetupResponse(string Secret, string AuthenticatorUri);
+public sealed record TwoFactorCodeRequest(string Code);
+public sealed record LoginResponse(string Token, DateTime Expiration, int UserId, string FirstName, string Email, string Role, bool TwoFactorEnabled);
 public sealed record QuizResponse(int Id, int LectureId, string Title, string SubjectName, DateTime StartsAt, DateTime EndsAt, int QuestionCount, bool IsVisible, bool IsSubmitted);
 public sealed record LectureResponse(int Id, string SubjectName, DateTime StartsAt, DateTime EndsAt, string? Room)
 {

@@ -13,12 +13,15 @@ public sealed class LoginRequest : IValidatableObject
     [Required]
     public string Password { get; set; } = string.Empty;
 
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Two-factor code must contain six digits.")]
+    public string? TwoFactorCode { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         var hasIndex = !string.IsNullOrWhiteSpace(Index);
         var hasEmail = !string.IsNullOrWhiteSpace(Email);
 
-        if(hasEmail == hasIndex)
+        if (hasEmail == hasIndex)
         {
             yield return new ValidationResult(
                 "Provide either index for a student or email for a professor!",
@@ -26,5 +29,4 @@ public sealed class LoginRequest : IValidatableObject
         }
     }
 }
-
 

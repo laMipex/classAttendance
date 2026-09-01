@@ -31,6 +31,9 @@ public class DataContext : Microsoft.EntityFrameworkCore.DbContext
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
             .IsUnique();
+        modelBuilder.Entity<User>()
+            .Property(u => u.TwoFactorSecret)
+            .HasMaxLength(64);
 
         // ----- Student ------
         modelBuilder.Entity<Student>()

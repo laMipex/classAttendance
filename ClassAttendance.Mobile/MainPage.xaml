@@ -260,6 +260,9 @@ x:Name="MainPageRoot"
                                 <Label Text="{Binding ProfileSummary}" Style="{StaticResource CardBody}" />
                             </VerticalStackLayout>
                         </Border>
+                        <Button Text="{Binding TwoFactorButtonText}"
+                                Clicked="OnTwoFactorSetupClicked"
+                                Style="{StaticResource PrimaryActionButton}" />
                         <Button Text="Log out"
                                 Clicked="OnLogoutClicked"
                                 Style="{StaticResource OutlineActionButton}" />
@@ -353,6 +356,47 @@ x:Name="MainPageRoot"
                 <Button Grid.Column="2" Text="Profile" Clicked="OnProfileClicked" Style="{StaticResource NavigationButton}" />
             </Grid>
         </Grid>
+        <Grid IsVisible="{Binding IsChatOpen}"
+              InputTransparent="False"
+              VerticalOptions="End"
+              HorizontalOptions="End"
+              Margin="16,16,16,86"
+              WidthRequest="330"
+              HeightRequest="390"
+              BackgroundColor="White"
+              RowDefinitions="Auto,*,Auto">
+            <Grid Padding="14" BackgroundColor="#0798DE" ColumnDefinitions="Auto,*,Auto">
+                <Label Text="🤖" FontSize="22" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="Class Attendance Assistant" TextColor="White" FontFamily="RobotoBold" VerticalOptions="Center" />
+                <Button Grid.Column="2" Text="×" Clicked="OnChatToggleClicked" TextColor="White" BackgroundColor="Transparent" />
+            </Grid>
+            <CollectionView Grid.Row="1" ItemsSource="{Binding ChatMessages}" Margin="10" SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource ListCard}" Padding="10" Margin="0,3">
+                            <Label FormattedText="{Binding FormattedText}" Style="{StaticResource CardBody}" />
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Grid Grid.Row="2" Padding="8" ColumnDefinitions="*,Auto">
+                <Entry x:Name="ChatEntry" Placeholder="Ask me anything..." />
+                <Button Grid.Column="1" Text="Send" Clicked="OnChatSendClicked" Style="{StaticResource PrimaryActionButton}" />
+            </Grid>
+        </Grid>
+        <Button IsVisible="{Binding IsChatButtonVisible}"
+                Text="🤖"
+                Clicked="OnChatToggleClicked"
+                WidthRequest="60"
+                HeightRequest="60"
+                CornerRadius="30"
+                BackgroundColor="#0798DE"
+                TextColor="White"
+                FontSize="26"
+                HorizontalOptions="End"
+                VerticalOptions="End"
+                Margin="0,0,18,86"
+                ZIndex="10" />
         <Grid IsVisible="{Binding IsLoginSubmitting}" BackgroundColor="#80FFFFFF">
             <ActivityIndicator IsRunning="{Binding IsLoginSubmitting}"
                                Color="#0798DE"
@@ -360,6 +404,37 @@ x:Name="MainPageRoot"
                                HeightRequest="64"
                                HorizontalOptions="Center"
                                VerticalOptions="Center" />
+        </Grid>
+        <Grid IsVisible="{Binding IsAuthenticatorSetupVisible}"
+              BackgroundColor="#80000000"
+              ZIndex="20">
+            <Border BackgroundColor="White"
+                    StrokeThickness="0"
+                    Padding="24"
+                    Margin="24"
+                    VerticalOptions="Center">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Set up 2FA"
+                           FontSize="21"
+                           FontFamily="RobotoBold"
+                           TextColor="#172B4D" />
+                    <Label Text="Add this key to Google Authenticator or another TOTP app:"
+                           Style="{StaticResource CardBody}" />
+                    <Button Text="{Binding AuthenticatorSecret}"
+                            Clicked="OnAuthenticatorSecretClicked"
+                            BackgroundColor="#E8F5FC"
+                            TextColor="#0798DE"
+                            FontFamily="RobotoBold"
+                            FontSize="16"
+                            Padding="12"
+                            LineBreakMode="CharacterWrap" />
+                    <Label Text="Tap the key to copy it, then add it to your authenticator app."
+                           Style="{StaticResource CardBody}" />
+                    <Button Text="Continue"
+                            Clicked="OnAuthenticatorContinueClicked"
+                            Style="{StaticResource PrimaryActionButton}" />
+                </VerticalStackLayout>
+            </Border>
         </Grid>
     </Grid>
 </ContentPage>
