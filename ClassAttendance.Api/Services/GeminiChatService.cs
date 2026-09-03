@@ -30,7 +30,7 @@ public sealed class GeminiChatService
         var endpoint = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={Uri.EscapeDataString(apiKey)}";
         var request = new
         {
-            system_instruction = new { parts = new[] { new { text = "You are the ClassAttendance assistant. Answer briefly and helpfully about attendance, schedules, quizzes, and account login. Use the supplied user context for personal questions. Never invent schedule or quiz data. If the context does not contain the answer, say so. Reply in the language used by the user." } } },
+            system_instruction = new { parts = new[] { new { text = "You are the ClassAttendance assistant. Help the user with attendance, schedules, quizzes, account login, and other general questions. For personal questions about the user's schedule, quizzes, or attendance, use the supplied user context and never invent application data; if the context does not contain the answer, say so. For general educational or everyday questions, answer normally with a concrete, useful explanation and examples. Reply in the language used by the user." } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = $"User context:\n{userContext}\n\nQuestion:\n{message}" } } } }
         };
 
@@ -42,12 +42,40 @@ public sealed class GeminiChatService
                 $"Gemini returned {(int)response.StatusCode} ({response.ReasonPhrase}): {responseBody}");
         }
         using var document = JsonDocument.Parse(responseBody);
-        return document.RootElement
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString()
-            ?? throw new InvalidOperationException("Gemini returned an empty response.");
+        if (!document.RootElement.TryGetProperty("candidates", out var candidates))
+        {
+            throw new InvalidOperationException("Gemini returned no candidates.");
+        }
+
+        foreach (var candidate in candidates.EnumerateArray())
+        {
+            if (!candidate.TryGetProperty("content", out var content)
+                || !content.TryGetProperty("parts", out var parts))
+            {
+                continue;
+            }
+
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (part.TryGetProperty("text", out var text)
+                    && text.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(text.GetString()))
+                {
+                    return text.GetString()!;
+                }
+            }
+        }
+
+        string? finishReason = null;
+        if (candidates.GetArrayLength() > 0
+            && candidates[0].TryGetProperty("finishReason", out var reason)
+            && reason.ValueKind == JsonValueKind.String)
+        {
+            finishReason = reason.GetString();
+        }
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(finishReason)
+                ? "Gemini returned no text."
+                : $"Gemini returned no text (finish reason: {finishReason}).");
     }
 }
