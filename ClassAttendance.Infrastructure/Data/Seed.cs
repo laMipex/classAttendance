@@ -394,42 +394,50 @@ namespace ClassAttendance.Infrastructure.Data
                 new { Day = 4, Hour = 12, Subject = "WEB1", Professor = "milica.jovanovic@classattendance.com", Room = "B2" }
             };
 
-            var weekStart = StartOfWeek(DateTime.UtcNow);
-            foreach (var item in schedule)
+            var weekStarts = new[]
             {
-                if (!subjectIds.TryGetValue(item.Subject, out var subjectId)
-                    || !professorIds.TryGetValue(item.Professor, out var professorId))
-                {
-                    continue;
-                }
+                StartOfWeek(DateTime.UtcNow),
+                StartOfWeek(DateTime.UtcNow).AddDays(7)
+            };
 
-                var startsAt = weekStart.AddDays(item.Day).AddHours(item.Hour);
-                var lectureExists = await db.Lectures.AnyAsync(
-                    lecture => lecture.SubjectId == subjectId
-                        && lecture.ProfessorId == professorId
-                        && lecture.StartsAt == startsAt, ct);
-                if (lectureExists)
+            foreach (var weekStart in weekStarts)
+            {
+                foreach (var item in schedule)
                 {
-                    continue;
-                }
+                    if (!subjectIds.TryGetValue(item.Subject, out var subjectId)
+                        || !professorIds.TryGetValue(item.Professor, out var professorId))
+                    {
+                        continue;
+                    }
 
-                var lecture = new Lecture
-                {
-                    SubjectId = subjectId,
-                    ProfessorId = professorId,
-                    StartsAt = startsAt,
-                    EndsAt = startsAt.AddHours(2),
-                    Rooms = item.Room
-                };
-                db.Lectures.Add(lecture);
-                await db.SaveChangesAsync(ct);
-                db.AttendanceSessions.Add(new AttendanceSession
-                {
-                    LectureId = lecture.Id,
-                    OpenFrom = startsAt.AddMinutes(-15),
-                    OpenUntil = startsAt.AddMinutes(15),
-                    WifiRequired = false
-                });
+                    var startsAt = weekStart.AddDays(item.Day).AddHours(item.Hour);
+                    var lectureExists = await db.Lectures.AnyAsync(
+                        lecture => lecture.SubjectId == subjectId
+                            && lecture.ProfessorId == professorId
+                            && lecture.StartsAt == startsAt, ct);
+                    if (lectureExists)
+                    {
+                        continue;
+                    }
+
+                    var lecture = new Lecture
+                    {
+                        SubjectId = subjectId,
+                        ProfessorId = professorId,
+                        StartsAt = startsAt,
+                        EndsAt = startsAt.AddHours(2),
+                        Rooms = item.Room
+                    };
+                    db.Lectures.Add(lecture);
+                    await db.SaveChangesAsync(ct);
+                    db.AttendanceSessions.Add(new AttendanceSession
+                    {
+                        LectureId = lecture.Id,
+                        OpenFrom = startsAt.AddMinutes(-15),
+                        OpenUntil = startsAt.AddMinutes(15),
+                        WifiRequired = false
+                    });
+                }
             }
 
             await db.SaveChangesAsync(ct);

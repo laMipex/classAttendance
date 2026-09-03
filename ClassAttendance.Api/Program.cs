@@ -6,6 +6,7 @@ using ClassAttendance.Infrastructure.Persistence;
 using ClassAttendance.Infrastructure.Repositories;
 using ClassAttendance.Infrastructure.Security;
 using ClassAttendance.Infrastructure.Services;
+using ClassAttendance.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -35,6 +36,7 @@ jwtOptions.Validate();
 builder.Services.AddSingleton(jwtOptions);
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddHttpClient<GeminiChatService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

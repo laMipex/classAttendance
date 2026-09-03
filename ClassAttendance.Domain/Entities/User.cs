@@ -13,5 +13,7 @@ namespace ClassAttendance.Domain.Entities
         public string Password { get; set; } = null!;
         public string Role { get; set; } = null!;
         public bool IsActive { get; set; }
+        public string? TwoFactorSecret { get; set; }
+        public bool TwoFactorEnabled { get; set; }
     }
 }

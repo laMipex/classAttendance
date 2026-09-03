@@ -10,7 +10,8 @@ public sealed record LoginResult(
     int UserId,
     string FirstName,
     string Email,
-    string Role
+    string Role,
+    bool TwoFactorEnabled
 );
 
-
+public sealed record TwoFactorSetupResult(string Secret, string AuthenticatorUri);
