@@ -60,7 +60,12 @@ public sealed class ChatbotController : ControllerBase
             || normalized.Contains("next class")
             || normalized.Contains("sledeći čas")
             || normalized.Contains("sledeci cas")
-            || normalized.Contains("naredni čas");
+            || normalized.Contains("naredni čas")
+            || normalized.Contains("sledeće predavanje")
+            || normalized.Contains("sledece predavanje")
+            || normalized.Contains("naredno predavanje")
+            || normalized.Contains("sledećeg predavanja")
+            || normalized.Contains("sledeceg predavanja");
         var asksAboutToday = normalized.Contains("what lecture do i have today")
             || normalized.Contains("lectures today")
             || normalized.Contains("classes today")
@@ -84,17 +89,17 @@ public sealed class ChatbotController : ControllerBase
             {
                 var today = DateTime.Now.Date;
                 var todayLectures = lectures
-                    .Where(lecture => DateTime.SpecifyKind(lecture.StartsAt, DateTimeKind.Utc).ToLocalTime().Date == today)
+                    .Where(lecture => AsUtc(lecture.StartsAt).ToLocalTime().Date == today)
                     .OrderBy(lecture => lecture.StartsAt)
                     .ToList();
                 return todayLectures.Count == 0
                     ? "You have no lectures scheduled for today."
                     : $"Today's lectures:\n{string.Join("\n", todayLectures.Select(lecture =>
-                        $"- **{lecture.SubjectName}** at {lecture.StartsAt.ToLocalTime():HH:mm}, room {lecture.Room ?? "not specified"}"))}";
+                        $"- **{lecture.SubjectName}** at {AsUtc(lecture.StartsAt).ToLocalTime():HH:mm}, room {lecture.Room ?? "not specified"}"))}";
             }
 
             var nextLecture = lectures
-                .Where(lecture => DateTime.SpecifyKind(lecture.StartsAt, DateTimeKind.Utc) >= now)
+                .Where(lecture => AsUtc(lecture.StartsAt) >= now)
                 .OrderBy(lecture => lecture.StartsAt)
                 .FirstOrDefault();
             if (nextLecture is null)
@@ -103,8 +108,8 @@ public sealed class ChatbotController : ControllerBase
             }
 
             return asksAboutLecturer
-                ? $"The next lecture is {nextLecture.SubjectName} at {nextLecture.StartsAt.ToLocalTime():dd.MM.yyyy. HH:mm}. The lecturer is {nextLecture.ProfessorName}."
-                : $"The next lecture is {nextLecture.SubjectName}, at {nextLecture.StartsAt.ToLocalTime():dd.MM.yyyy. HH:mm}, room {nextLecture.Room ?? "not specified"}.";
+                ? $"The next lecture is {nextLecture.SubjectName} at {AsUtc(nextLecture.StartsAt).ToLocalTime():dd.MM.yyyy. HH:mm}. The lecturer is {nextLecture.ProfessorName}."
+                : $"The next lecture is {nextLecture.SubjectName}, at {AsUtc(nextLecture.StartsAt).ToLocalTime():dd.MM.yyyy. HH:mm}, room {nextLecture.Room ?? "not specified"}.";
         }
 
         if (isStudent && (normalized.Contains("quiz") || normalized.Contains("kviz") || normalized.Contains("odgovorio")))
@@ -124,6 +129,11 @@ public sealed class ChatbotController : ControllerBase
 
         return null;
     }
+
+    private static DateTime AsUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
     private async Task<string> BuildUserContextAsync(
         int userId,
